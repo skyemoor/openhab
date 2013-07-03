@@ -791,12 +791,6 @@ public class ZWaveController implements SerialInterfaceEventListener {
 	private void handleMessageApplicationUpdateRequest(SerialMessage message){
 		logger.info("Handle Message Application Update Request");
 		
-		// Off message for picture box lights = 01 10 00 49 84 02 0A 04 10 01 25 27 73 70 86 72 77 BD
-		// On message for picture box lights = 01 10 00 49 84 02 0A 04 10 01 25 27 73 70 86 72 77 BD
-		// payload = 84 02 0A 04 10 01 25 27 73 70 86 72 77
-		// from ozw; node = data[3]
-		// from oh; node = payload[1]
-		
 		//TODO: Zwave devices with a remote control do not report this update. Figure out how to handle.
 		
 				
@@ -982,11 +976,11 @@ public class ZWaveController implements SerialInterfaceEventListener {
 	public Map<String, Integer> getSerialInterfaceStats() {
 		Map<String, Integer> statMap = new HashMap<String, Integer>();
 		
-		logger.debug("Get Stats for SOF = {}" + this.serialInterface.getSOFCount());
-		logger.debug("Get Stats for CAN = {}" + this.serialInterface.getCANCount());
-		logger.debug("Get Stats for NAK = {}" + this.serialInterface.getNAKCount());
-		logger.debug("Get Stats for ACK = {}" + this.serialInterface.getACKCount());
-		logger.debug("Get Stats for OOF = {}" + this.serialInterface.getOOFCount());
+		//logger.debug("Get Stats for SOF = {}" + this.serialInterface.getSOFCount());
+		//logger.debug("Get Stats for CAN = {}" + this.serialInterface.getCANCount());
+		//logger.debug("Get Stats for NAK = {}" + this.serialInterface.getNAKCount());
+		//logger.debug("Get Stats for ACK = {}" + this.serialInterface.getACKCount());
+		//logger.debug("Get Stats for OOF = {}" + this.serialInterface.getOOFCount());
 		
 		statMap.put("SOF", this.serialInterface.getSOFCount());
 		statMap.put("CAN", this.serialInterface.getCANCount());

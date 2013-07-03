@@ -59,7 +59,8 @@ import org.slf4j.LoggerFactory;
  * like querying a Website/Device.
  * 
  * @author Victor Belov
- * @since 1.2.0
+ * @author Brian Crosby
+ * @since 1.3.0
  */
 public class ZWaveActiveBinding extends AbstractActiveBinding<ZWaveBindingProvider> implements ManagedService, ZWaveEventListener {
 
@@ -67,8 +68,10 @@ public class ZWaveActiveBinding extends AbstractActiveBinding<ZWaveBindingProvid
 
 	private boolean isProperlyConfigured = false;
 
-	/** the refresh interval which is used to poll values from the ZWave server (optional, defaults to 60000ms) */
-	private long refreshInterval = 60000;
+	/** the refresh interval which is used to poll values from the ZWave server (optional, defaults to 10000ms); delay is a 10ms factor of refreshing non critical values */
+	private long refreshInterval = 10000;
+	private int refreshDelay = 6;
+	private int refreshCount = 0;
 	private String port;
 	private SerialInterface serialInterface;
 	private ZWaveController zController;
@@ -123,72 +126,86 @@ public class ZWaveActiveBinding extends AbstractActiveBinding<ZWaveBindingProvid
 		
 			State value = UnDefType.UNDEF;
 			
+			refreshCount++;
+			if(refreshCount > refreshDelay){
+				logger.debug("Reseting Refresh Count to Zero");
+				refreshCount = 0;
+			}
+			else{
+				logger.debug(String.format("Refresh Count: %d", refreshCount));
+			}
+			
 			// the frequently executed code goes here ...
 			for (ZWaveBindingProvider provider : providers) {
 				for (String itemName : provider.getItemNames()) {
 					
 					String nodeIdString = provider.getZwaveData(itemName).getNodeId();
 					ZWaveReportCommands rCommand = provider.getZwaveData(itemName).getCommand();
+					
 					//logger.debug("updating nodeIdString = {}, nodeCommand = {}", nodeIdString, rCommand.toString());
+					
 					try {
-						
-						//TODO: implement a better means then polling to get values
-						//this.zController.requestLevel(Integer.parseInt(nodeIdString));
-						
-						// Binding specified a command if rCommand is anything but NONE
-						if(rCommand != ZWaveReportCommands.NONE)
-						{
-													
-							//logger.debug("From Zwave Active Binding Execute::item found that needs reporting, posting update.");
-							ZWaveNode zNode = this.zController.getZwaveNodes().get(Integer.parseInt(nodeIdString));
-							if (rCommand == ZWaveReportCommands.HOMEID)
-								value = new StringType(String.format("0x%08X", zNode.getHomeId()));
-							else if (rCommand == ZWaveReportCommands.NODEID)
-								value = new StringType(String.format("%d", zNode.getNodeId()));
-							else if (rCommand == ZWaveReportCommands.MANUFACTURER)
-								value = new StringType(String.format("0x%04x", zNode.getManufacturer()));
-							else if (rCommand == ZWaveReportCommands.DEVICE_TYPE)
-								value = new StringType(String.format("0x%04x", zNode.getDeviceType()));
-							else if (rCommand == ZWaveReportCommands.DEVICE_TYPE_ID)
-								value = new StringType(String.format("0x%04x", zNode.getDeviceId()));
-							else if (rCommand == ZWaveReportCommands.BASIC)
-								value = new StringType(String.format("0x%02x", zNode.getBasicDeviceClass()));
-							else if (rCommand == ZWaveReportCommands.BASIC_LABEL)
-								value = new StringType(String.format("%s", zNode.zCC.getBasicCommandClass().getLabel()));
-							else if (rCommand == ZWaveReportCommands.GENERIC)
-								value = new StringType(String.format("0x%02x", zNode.getGenericDeviceClass()));
-							else if (rCommand == ZWaveReportCommands.GENERIC_LABEL)
-								value = new StringType(String.format("%s", zNode.zCC.getGenericCommandClass().getLabel()));
-							else if (rCommand == ZWaveReportCommands.SPECIFIC)
-								value = new StringType(String.format("0x%02x", zNode.getSpecificDeviceClass()));
-							else if (rCommand == ZWaveReportCommands.SPECIFIC_LABEL)
-								value = new StringType(String.format("%s", zNode.zCC.getSpecificCommandClass().getLabel()));
-							else if (rCommand == ZWaveReportCommands.VERSION)
-								value = new StringType(String.format("%s", zNode.getVersion()));
-							else if (rCommand == ZWaveReportCommands.ROUTING)
-								value = new StringType(String.format("%s", (zNode.isRouting() == true) ? "True" : "False"));
-							else if (rCommand == ZWaveReportCommands.LISTENING)
-								value = new StringType(String.format("%s", (zNode.isListening() == true) ? "True" : "False"));
-							else if (rCommand == ZWaveReportCommands.SLEEPING_DEAD)
-								value = new StringType(String.format("%s", (zNode.isSleepingOrDead() == true) ? "True" : "False"));
-							else if (rCommand == ZWaveReportCommands.NAK)
-								value = new StringType(String.format("%s", this.zController.getSerialInterfaceStats().get("NAK")));
-							else if (rCommand == ZWaveReportCommands.SOF)
-								value = new StringType(String.format("%s", this.zController.getSerialInterfaceStats().get("SOF")));
-							else if (rCommand == ZWaveReportCommands.CAN)
-								value = new StringType(String.format("%s", this.zController.getSerialInterfaceStats().get("CAN")));
-							else if (rCommand == ZWaveReportCommands.ACK)
-								value = new StringType(String.format("%s", this.zController.getSerialInterfaceStats().get("ACK")));
-							else if (rCommand == ZWaveReportCommands.OOF)
-								value = new StringType(String.format("%s", this.zController.getSerialInterfaceStats().get("OOF")));
-							else if (rCommand == ZWaveReportCommands.LASTUPDATE){
-								SimpleDateFormat sdf = new SimpleDateFormat("MMM d yyyy HH:mm:ss");
-								value = new StringType(String.format("%s", sdf.format(zNode.getLastUpdated()).toString() ));
-							}
-							else
-								logger.info("ZWave Binding Reporting Type not supported! ZWave Report Command = {}", rCommand);
 							
-							eventPublisher.postUpdate(itemName, value);
+							//TODO: implement a better means then polling to get values
+							if(refreshCount == 0){
+								if(rCommand == ZWaveReportCommands.NONE) // just a plain node; no reporting.
+									this.zController.requestLevel(Integer.parseInt(nodeIdString));
+							}
+							
+							// Binding specified a command if rCommand is anything but NONE
+							if(rCommand != ZWaveReportCommands.NONE)
+							{						
+								//logger.debug("From Zwave Active Binding Execute::item found that needs reporting, posting update.");
+								ZWaveNode zNode = this.zController.getZwaveNodes().get(Integer.parseInt(nodeIdString));
+								if (rCommand == ZWaveReportCommands.HOMEID)
+									value = new StringType(String.format("0x%08X", zNode.getHomeId()));
+								else if (rCommand == ZWaveReportCommands.NODEID)
+									value = new StringType(String.format("%d", zNode.getNodeId()));
+								else if (rCommand == ZWaveReportCommands.MANUFACTURER)
+									value = new StringType(String.format("0x%04x", zNode.getManufacturer()));
+								else if (rCommand == ZWaveReportCommands.DEVICE_TYPE)
+									value = new StringType(String.format("0x%04x", zNode.getDeviceType()));
+								else if (rCommand == ZWaveReportCommands.DEVICE_TYPE_ID)
+									value = new StringType(String.format("0x%04x", zNode.getDeviceId()));
+								else if (rCommand == ZWaveReportCommands.BASIC)
+									value = new StringType(String.format("0x%02x", zNode.getBasicDeviceClass()));
+								else if (rCommand == ZWaveReportCommands.BASIC_LABEL)
+									value = new StringType(String.format("%s", zNode.zCC.getBasicCommandClass().getLabel()));
+								else if (rCommand == ZWaveReportCommands.GENERIC)
+									value = new StringType(String.format("0x%02x", zNode.getGenericDeviceClass()));
+								else if (rCommand == ZWaveReportCommands.GENERIC_LABEL)
+									value = new StringType(String.format("%s", zNode.zCC.getGenericCommandClass().getLabel()));
+								else if (rCommand == ZWaveReportCommands.SPECIFIC)
+									value = new StringType(String.format("0x%02x", zNode.getSpecificDeviceClass()));
+								else if (rCommand == ZWaveReportCommands.SPECIFIC_LABEL)
+									value = new StringType(String.format("%s", zNode.zCC.getSpecificCommandClass().getLabel()));
+								else if (rCommand == ZWaveReportCommands.VERSION)
+									value = new StringType(String.format("%s", zNode.getVersion()));
+								else if (rCommand == ZWaveReportCommands.ROUTING)
+									value = new StringType(String.format("%s", (zNode.isRouting() == true) ? "True" : "False"));
+								else if (rCommand == ZWaveReportCommands.LISTENING)
+									value = new StringType(String.format("%s", (zNode.isListening() == true) ? "True" : "False"));
+								else if (rCommand == ZWaveReportCommands.SLEEPING_DEAD)
+									value = new StringType(String.format("%s", (zNode.isSleepingOrDead() == true) ? "True" : "False"));
+								else if (rCommand == ZWaveReportCommands.NAK)
+									value = new StringType(String.format("%s", this.zController.getSerialInterfaceStats().get("NAK")));
+								else if (rCommand == ZWaveReportCommands.SOF)
+									value = new StringType(String.format("%s", this.zController.getSerialInterfaceStats().get("SOF")));
+								else if (rCommand == ZWaveReportCommands.CAN)
+									value = new StringType(String.format("%s", this.zController.getSerialInterfaceStats().get("CAN")));
+								else if (rCommand == ZWaveReportCommands.ACK)
+									value = new StringType(String.format("%s", this.zController.getSerialInterfaceStats().get("ACK")));
+								else if (rCommand == ZWaveReportCommands.OOF)
+									value = new StringType(String.format("%s", this.zController.getSerialInterfaceStats().get("OOF")));
+								else if (rCommand == ZWaveReportCommands.LASTUPDATE){
+									SimpleDateFormat sdf = new SimpleDateFormat("MMM d yyyy HH:mm:ss");
+									value = new StringType(String.format("%s", sdf.format(zNode.getLastUpdated()).toString() ));
+								}
+								else {
+									logger.info("ZWave Binding Reporting Type not supported! ZWave Report Command = {}", rCommand);
+								}
+								eventPublisher.postUpdate(itemName, value);
+						
 						}
 					} catch (NumberFormatException e) {
 						// nop
@@ -256,6 +273,10 @@ public class ZWaveActiveBinding extends AbstractActiveBinding<ZWaveBindingProvid
 			String refreshIntervalString = (String) config.get("refresh");
 			if (StringUtils.isNotBlank(refreshIntervalString)) {
 				refreshInterval = Long.parseLong(refreshIntervalString);
+			}
+			String refreshDelayString = (String) config.get("refreshDelay");
+			if (StringUtils.isNotBlank(refreshDelayString)) {
+				refreshDelay = Integer.parseInt(refreshDelayString);
 			}
 			if (StringUtils.isNotBlank((String) config.get("port"))) {
 				port = (String) config.get("port");

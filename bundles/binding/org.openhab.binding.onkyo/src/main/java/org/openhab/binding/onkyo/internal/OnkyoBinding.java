@@ -124,6 +124,7 @@ public class OnkyoBinding extends AbstractBinding<OnkyoBindingProvider> implemen
 		OnkyoBindingProvider firstMatchingProvider = null;
 
 		for (OnkyoBindingProvider provider : this.providers) {
+			logger.debug("Provider: {}", provider.toString());
 			String tmp = provider.getDeviceCommand(itemName, command.toString());
 			if (tmp != null) {
 				firstMatchingProvider = provider;

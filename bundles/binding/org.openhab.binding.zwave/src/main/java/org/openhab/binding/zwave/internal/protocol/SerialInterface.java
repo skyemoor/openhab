@@ -51,7 +51,8 @@ import gnu.io.UnsupportedCommOperationException;
  * This class implements communications with a standard USB Z-Wave stick over serial protocol
  * 
  * @author Victor Belov
- * @since 1.2.0
+ * @author Brian Crosby
+ * @since 1.3.0
  */
 
 public class SerialInterface {

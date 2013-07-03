@@ -18,7 +18,7 @@ import org.openhab.binding.zwave.ZWaveCommandClass.Specific;
 public class ZWaveNode {
 
 	/* Possible Query stages. 
-	 * Taken from openzwave
+	 * Originally Sourced from openzwave, LinuxMCE, and other opensource documentation. Merged into OH and no longer the valid.
 	QueryStage_ProtocolInfo,                             	< Retrieve protocol information 
     QueryStage_Probe,                                       < Ping device to see if alive 
     QueryStage_WakeUp,                                      < Start wake up process if a sleeping node 

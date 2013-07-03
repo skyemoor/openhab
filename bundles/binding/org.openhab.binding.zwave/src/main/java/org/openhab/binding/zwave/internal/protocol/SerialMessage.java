@@ -40,6 +40,7 @@ import org.slf4j.LoggerFactory;
  * This class represents a message which is used in serial API interface to communicate with usb Z-Wave stick
  * 
  * @author Victor Belov
+ * @author Brian Crosby
  * @since 1.2.0
  */
 
