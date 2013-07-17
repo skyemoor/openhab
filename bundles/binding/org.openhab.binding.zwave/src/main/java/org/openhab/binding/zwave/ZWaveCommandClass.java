@@ -168,7 +168,7 @@ public class ZWaveCommandClass {
 	            }
 	        }
 	        return result;
-	 }
+		}
 	 
 	    private static void initMapping() {
 	    	codeToSpecificMapping = new HashMap<Integer, Specific>();
@@ -177,13 +177,13 @@ public class ZWaveCommandClass {
 	        }
 	    }
 	
-	/**
-	 * @return the label
-	 */
-	public String getLabel() {
-		return label;
-	}
-		
+		/**
+		 * @return the label
+		 */
+		public String getLabel() {
+			return label;
+		}
+			
 	}
 	
 	//public enum COMMAND_CLASS_ALARM	 0x71
@@ -318,8 +318,35 @@ public class ZWaveCommandClass {
 	//public enum COMMAND_CLASS_MULTI_CHANNEL_ASSOCIATION_V2	 0x8E	 
 	//public enum COMMAND_CLASS_MULTI_CHANNEL_V2	 0x60	 
 	//public enum COMMAND_CLASS_MULTI_CMD	 0x8F	 
-	//public enum COMMAND_CLASS_MULTI_INSTANCE_ASSOCIATION	 0x8E	 
-	//public enum COMMAND_CLASS_MULTI_INSTANCE	 0x60	 
+	//public enum COMMAND_CLASS_MULTI_INSTANCE_ASSOCIATION	 0x8E
+	
+	public enum COMMAND_CLASS_MULTI_INSTANCE {
+		ID(0x60),
+		INSTANCE_GET(0x04),
+		INSTANCE_REPORT(0x05),
+		INSTANCE_ENCAP(0x06),
+		ENDPOINT_GET(0x07),
+		ENDPOINT_REPORT(0x08),
+		CAPABILITY_GET(0x09),
+		CAPABILITY_REPORT(0x0a),
+		ENDPOINT_FIND(0x0b),
+		ENDPOINT_FIND_REPORT(0x0c),
+		ENDPOINT_ENCAP(0x0d);		
+		
+		/**
+		 * @param command
+		 */
+		private COMMAND_CLASS_MULTI_INSTANCE(int command) {
+			this.command = command;
+		}
+
+		private int command;
+		
+		public int getCommand(){
+			return this.command;
+		}
+	}
+	
 	public enum COMMAND_CLASS_NO_OPERATION	{
 		ID(0x00);
 		

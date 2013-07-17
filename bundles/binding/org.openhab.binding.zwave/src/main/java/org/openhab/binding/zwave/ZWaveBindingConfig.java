@@ -10,16 +10,22 @@ import org.openhab.core.binding.BindingConfig;
 
 public class ZWaveBindingConfig implements BindingConfig {
 	
-	public ZWaveBindingConfig(String nodeId, ZWaveReportCommands command ) {
+	public ZWaveBindingConfig(String nodeId, int endpoint, ZWaveReportCommands command ) {
 		this.nodeId = nodeId;
 		this.command = command;
+		this.endpoint = endpoint;
 	}
 	
 	private String nodeId;
+	private int	endpoint;
 	private ZWaveReportCommands command;
 	
 	public String getNodeId() {
 		return nodeId;
+	}
+	
+	public int getEndpoint() {
+		return endpoint;
 	}
 
 	/**

@@ -1,5 +1,6 @@
 package org.openhab.binding.zwave.internal.protocol;
 
+import java.lang.reflect.Array;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -24,6 +25,14 @@ import org.slf4j.LoggerFactory;
  * @since 1.3.0
  */
 
+/**
+ * @author jws
+ *
+ */
+/**
+ * @author jws
+ *
+ */
 public class ZWaveController implements SerialInterfaceEventListener {
 
 	public static final byte MessageSerialApiGetInitData = 0x02;
@@ -83,11 +92,24 @@ public class ZWaveController implements SerialInterfaceEventListener {
 	public static final byte CommandClassSwitchBinary = 0x25;			// where did this come from?
 	public static final byte CommandClassMultiLevelRemoteSwitch = 0x26;	// where did this come from?
 	public static final byte CommandClassMeter = 0x32;					// where did this come from?
+	public static final byte CommandClassMultiInstance = 0x60;					// where did this come from?
 	
 	public static final byte SwitchBinaryCmdSet = 0x01;					//TODO: not used, part of CC Class now
 	public static final byte SwitchBinaryCmdGet = 0x02;
 	public static final byte SwitchBinaryCmdReport = 0x03;
 
+	public static final byte MultiInstanceCmdGet = 0x04;
+	public static final byte MultiInstanceCmdReport	= 0x05;
+	public static final byte MultiInstanceCmdEncap = 0x06;
+
+	public static final byte MultiChannelCmdEndPointGet = 0x07;
+	public static final byte MultiChannelCmdEndPointReport = 0x08;
+	public static final byte MultiChannelCmdCapabilityGet = 0x09;
+	public static final byte MultiChannelCmdCapabilityReport = 0x0a;
+	public static final byte MultiChannelCmdEndPointFind = 0x0b;
+	public static final byte MultiChannelCmdEndPointFindReport = 0x0c;
+	public static final byte MultiChannelCmdEncap = 0x0d;
+	
 	private SerialInterface serialInterface;
 	private static final Logger logger = LoggerFactory.getLogger(ZWaveController.class);
 	//private ArrayList<ZWaveNode> zwaveNodes;
@@ -155,7 +177,7 @@ public class ZWaveController implements SerialInterfaceEventListener {
 		}
 		
 		if(this.zwaveNodes.size() == completeCount){
-			ZWaveEvent zEvent = new ZWaveEvent(ZWaveEvent.NETWORK_EVENT, 0, "INIT_DONE");
+			ZWaveEvent zEvent = new ZWaveEvent(ZWaveEvent.NETWORK_EVENT, 1, 0, "INIT_DONE");
 			this.notifyEventListeners(zEvent);
 		}
 		else {
@@ -199,19 +221,27 @@ public class ZWaveController implements SerialInterfaceEventListener {
 	}
 	*/
 	
-	public void requestLevel(int nodeId) {
+	public void requestLevel(int nodeId, int endpoint) {
     	SerialMessage newMessage = new SerialMessage((byte)0x13, SerialInterface.MessageTypeRequest);
     	// NodeId, 3 is command length, 0x20 is COMMAND_CLASS_BASIC, 2 is BASIC_GET, level, 5 is TRANSMIT_OPTION_ACK+TRANSMIT_OPTION_AUTO_ROUTE
     	byte[] newPayload = { (byte) nodeId, 3, 0x20, 2, 37 , 0};
     	newMessage.setMessagePayload(newPayload);
+    	
+    	if (endpoint != 1)
+    		this.encapsulate(endpoint, newMessage);
+    	
     	this.serialInterface.sendMessage(newMessage);		
 	}
 	
-	public void sendLevel(int nodeId, int level) {
+	public void sendLevel(int nodeId, int endpoint, int level) {
     	SerialMessage newMessage = new SerialMessage((byte)0x13, SerialInterface.MessageTypeRequest);
     	// NodeId, 3 is command length, 0x20 is COMMAND_CLASS_BASIC, 1 is BASIC_SET, level, 5 is TRANSMIT_OPTION_ACK+TRANSMIT_OPTION_AUTO_ROUTE
     	byte[] newPayload = { (byte) nodeId, 3, 0x20, 1, (byte)level, 5 , 0};
     	newMessage.setMessagePayload(newPayload);
+    	
+    	if (endpoint != 1)
+    		this.encapsulate(endpoint, newMessage);
+    	
     	this.serialInterface.sendMessage(newMessage);		
 	}
 	
@@ -223,6 +253,21 @@ public class ZWaveController implements SerialInterfaceEventListener {
     	byte[] newPayload = { (byte) nodeId, 2, (byte) ZWaveCommandClass.COMMAND_CLASS_MANUFACTURER_SPECIFIC.ID.getCommand(), (byte) ZWaveCommandClass.COMMAND_CLASS_MANUFACTURER_SPECIFIC.GET.getCommand() ,5 , 0};
     	newMessage.setMessagePayload(newPayload);
     	this.serialInterface.sendMessage(newMessage);		
+	}
+	
+	private void encapsulate(int endpoint, SerialMessage message)
+	{
+		byte[] payload = message.getMessagePayload();
+		byte[] newPayload = new byte[payload.length + 4];
+		System.arraycopy(payload, 0, newPayload, 0, 2);
+		System.arraycopy(payload, 0, newPayload, 4, payload.length);
+		newPayload[1] += 4;
+		newPayload[2] = 0x60;
+		newPayload[3] = 0x0d;
+		newPayload[4] = 0x01;
+		newPayload[5] = (byte)(endpoint);
+		
+		message.setMessagePayload(newPayload);
 	}
 	
 	@Override
@@ -375,58 +420,9 @@ public class ZWaveController implements SerialInterfaceEventListener {
 			logger.info("Message type = REQUEST");
 			switch (incomingMessage.getMessageClass()) {
 				case MessageApplicationCommandHandler:
-					byte commandClass = incomingMessage.getMessagePayload()[3];
-					int sourceNodeId = incomingMessage.getMessagePayload()[1];
-					
-					// Update last time this node was updated
-					this.zwaveNodes.get(sourceNodeId).setLastUpdated(Calendar.getInstance().getTime());
-					logger.info(String.format("Got MessageApplicationCommandHandler for Source Node = %d and CommandClass = 0x%02X", sourceNodeId, commandClass));
-					// TODO: update to handle all supported CommandClasses
-					switch (commandClass) {
-						case CommandClassSwitchBinary:
-						case CommandClassMultiLevelRemoteSwitch:
-						case CommandClassBasic:
-							int eventType = commandClass == CommandClassSwitchBinary ? ZWaveEvent.SWITCH_EVENT : ZWaveEvent.DIMMER_EVENT;
-							logger.info("Got CommandClassSwitchBinary or CommandClassMultiLevelRemoteSwitch");
-							byte switchBinaryCmd = incomingMessage.getMessagePayload()[4];
-							switch (switchBinaryCmd) {
-								case SwitchBinaryCmdSet:
-									logger.info("SwitchBinary set");
-									break;
-								case SwitchBinaryCmdGet:
-									logger.info("SwitchBinary get");
-									break;
-								case SwitchBinaryCmdReport:
-									byte switchValue = incomingMessage.getMessagePayload()[5];
-									logger.info(String.format("SwitchBinary report from nodeId = %d, value = 0x%02X", sourceNodeId, switchValue));
-									String switchValueString = "";
-									if (switchValue == 0) {
-										switchValueString = "OFF";
-									// Not sure if this is working...
-									//} else if (switchValue < 99) {
-									//	switchValueString = String.valueOf(switchValue);
-									} else {
-										switchValueString = "ON";
-									}
-									ZWaveEvent zEvent = new ZWaveEvent(eventType, sourceNodeId, switchValueString);
-									this.notifyEventListeners(zEvent);
-									break;
-								default:
-									logger.info("Unknown SwitchBinary command");
-									break;
-								}
-							break;
-						case CommandClassMeter:
-							logger.info("Got CommandClassMeter");
-							break;
-						case 0x72:
-							logger.info("Got Message for Command Class Manuf. Specific");
-							handleManufactureSpecificRequest(incomingMessage);
-							break;
-						default:
-							logger.info(String.format("TODO: Implement processing of CommandClass = 0x%02X", commandClass));
-							break;
-						}
+					logger.info(String.format("MessageApplicationCommandHandler request."));
+					handleMessageApplicationCommandRequest(incomingMessage);
+					break;
 				case MessageSendData:
 					logger.info(String.format("MessageSendData request."));
 					handleMessageSendDataRequest(incomingMessage);
@@ -800,7 +796,7 @@ public class ZWaveController implements SerialInterfaceEventListener {
 		case (byte) 0x84:
 			// Update Node Info; something changed
 			logger.info("Application update request, updating node info.");
-			requestLevel(message.getMessagePayload()[1]);
+			requestLevel(message.getMessagePayload()[1], 1);
 			break;
 		case (byte) 0x82:
 			logger.info("Application update request, need to handle Node Info Request Done.");
@@ -888,9 +884,99 @@ public class ZWaveController implements SerialInterfaceEventListener {
 	private void handleMessageSendSlaveNodeInfoRequest(SerialMessage message){
 		logger.info("Handle Message Send Slave Node Info Request");
 	}
-	
+
+	/**
+	 * Handles Application Command message
+	 * @param message message to handle
+	 */
 	private void handleMessageApplicationCommandRequest(SerialMessage message){
+		int sourceNodeId = message.getMessagePayload()[1];
+		handleMessageApplicationCommandRequest(message, sourceNodeId, 1, 0);
+	}
+	
+	/**
+	 * Recursively handles application command request, demuxes multi instance commands;
+	 * @param message message to handle
+	 * @param sourceNodeId NodeId of node to handle message for.
+	 * @param endpoint Endpoint to handle message for
+	 * @offset to start processing in the serial message
+	 */
+	private void handleMessageApplicationCommandRequest(SerialMessage message, int sourceNodeId, int endpoint, int offset){
 		logger.info("Handle Message Application Command Request");
+		
+		byte commandClass = message.getMessagePayload()[3 + offset];
+		// Update last time this node was updated
+		this.zwaveNodes.get(sourceNodeId).setLastUpdated(Calendar.getInstance().getTime());
+		logger.info(String.format("Got MessageApplicationCommandHandler for Source Node = %d and CommandClass = 0x%02X", sourceNodeId, commandClass));
+		// TODO: update to handle all supported CommandClasses
+		switch (commandClass) {
+			case CommandClassSwitchBinary:
+			case CommandClassMultiLevelRemoteSwitch:
+			case CommandClassBasic:
+				int eventType = commandClass == CommandClassSwitchBinary ? ZWaveEvent.SWITCH_EVENT : ZWaveEvent.DIMMER_EVENT;
+				logger.info("Got CommandClassSwitchBinary or CommandClassMultiLevelRemoteSwitch");
+				byte switchBinaryCmd = message.getMessagePayload()[4 + offset];
+				switch (switchBinaryCmd) {
+					case SwitchBinaryCmdSet:
+						logger.info("SwitchBinary set");
+						break;
+					case SwitchBinaryCmdGet:
+						logger.info("SwitchBinary get");
+						break;
+					case SwitchBinaryCmdReport:
+						int switchValue = message.getMessagePayload()[5 + offset] & 0xFF; //handle signed to unsigned conversion 
+						logger.info(String.format("SwitchBinary report from nodeId = %d, value = 0x%02X", sourceNodeId, switchValue));
+						String switchValueString = "";
+						if (switchValue == 0) {
+							switchValueString = "OFF";
+						// Not sure if this is working...
+						} else if (switchValue < 99) {
+							switchValueString = String.valueOf(switchValue);
+						} else {
+							switchValueString = "ON";
+						}
+						ZWaveEvent zEvent = new ZWaveEvent(eventType,sourceNodeId, endpoint, switchValueString);
+						this.notifyEventListeners(zEvent);
+						break;
+					default:
+						logger.info("Unknown SwitchBinary command");
+						break;
+					}
+				break;
+			case CommandClassMultiInstance:
+				logger.info("Got CommandClassMultiInstance");
+				if (endpoint == 1) {
+					byte multiInstanceCmd = message.getMessagePayload()[4];
+					
+					switch  (multiInstanceCmd)
+					{
+						case MultiInstanceCmdEncap:
+							logger.info("Encapsulated Instance command");
+							endpoint = message.getMessagePayload()[5] & 0x7F;
+							handleMessageApplicationCommandRequest(message, sourceNodeId, endpoint, 3);
+							break;
+						case MultiChannelCmdEncap:
+							logger.info("Encapsulated Channel command");
+							endpoint = message.getMessagePayload()[5] & 0x7F;
+							handleMessageApplicationCommandRequest(message, sourceNodeId, endpoint, 4);
+							break;
+					}
+				} else
+				{
+					logger.debug("Unsupported nested MultiInstance command: 0x%02X", message.getMessageType());
+				}
+				break;
+			case CommandClassMeter:
+				logger.info("Got CommandClassMeter");
+				break;
+			case 0x72:
+				logger.info("Got Message for Command Class Manuf. Specific");
+				handleManufactureSpecificRequest(message);
+				break;
+			default:
+				logger.info(String.format("TODO: Implement processing of CommandClass = 0x%02X", commandClass));
+				break;
+		}	
 	}
 	
 	private void handleMessageApplicationSlaveCommandRequest(SerialMessage message){

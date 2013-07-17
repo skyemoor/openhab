@@ -89,6 +89,16 @@ public class ZWaveGenericBindingProvider extends AbstractGenericBindingProvider 
 			throw new BindingConfigParseException("node id must not be blank");
 		}
 
+		int endpoint = 1;
+		if(segments.length > 1){
+			try{
+				endpoint = Integer.parseInt(segments[1]);
+			} catch (Exception e){
+				throw new BindingConfigParseException(segments[1] + " is not a valid endpoint number");
+			}
+		}
+
+		
 		//ZWaveCommandClass commandClass = ZWaveCommandClass.SWITCH; // default setting
 		ZWaveReportCommands rCommand = ZWaveReportCommands.NONE; // default
 		
@@ -109,17 +119,17 @@ public class ZWaveGenericBindingProvider extends AbstractGenericBindingProvider 
 		}
 		*/
 		
-		if(segments.length > 1){
+		if(segments.length > 2){
 			try{
 				// TODO: need to valudate a reporting type to item type configuration
 					
-				rCommand = ZWaveReportCommands.valueOf(segments[1].toUpperCase());
+				rCommand = ZWaveReportCommands.valueOf(segments[2].toUpperCase());
 			} catch (Exception e){
-				throw new BindingConfigParseException(segments[1] + " is an unknown Z-Wave report command");
+				throw new BindingConfigParseException(segments[2] + " is an unknown Z-Wave report command");
 			}
 		}
 		
-		ZWaveBindingConfig config = new ZWaveBindingConfig(nodeId, rCommand);
+		ZWaveBindingConfig config = new ZWaveBindingConfig(nodeId, endpoint, rCommand);
 		addBindingConfig(item, config);
 	}
 

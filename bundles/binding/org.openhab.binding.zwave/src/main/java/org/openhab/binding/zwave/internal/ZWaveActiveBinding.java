@@ -108,7 +108,7 @@ public class ZWaveActiveBinding extends AbstractActiveBinding<ZWaveBindingProvid
 	 * @{inheritDoc}
 	 */
 	@Override
-	public boolean isProperlyConfigured() {
+	protected boolean isProperlyConfigured() {
 		return isProperlyConfigured;
 	}
 
@@ -140,6 +140,7 @@ public class ZWaveActiveBinding extends AbstractActiveBinding<ZWaveBindingProvid
 				for (String itemName : provider.getItemNames()) {
 					
 					String nodeIdString = provider.getZwaveData(itemName).getNodeId();
+					int endpoint = provider.getZwaveData(itemName).getEndpoint();
 					ZWaveReportCommands rCommand = provider.getZwaveData(itemName).getCommand();
 					
 					//logger.debug("updating nodeIdString = {}, nodeCommand = {}", nodeIdString, rCommand.toString());
@@ -149,7 +150,7 @@ public class ZWaveActiveBinding extends AbstractActiveBinding<ZWaveBindingProvid
 							//TODO: implement a better means then polling to get values
 							if(refreshCount == 0){
 								if(rCommand == ZWaveReportCommands.NONE) // just a plain node; no reporting.
-									this.zController.requestLevel(Integer.parseInt(nodeIdString));
+									this.zController.requestLevel(Integer.parseInt(nodeIdString), endpoint);
 							}
 							
 							// Binding specified a command if rCommand is anything but NONE
@@ -214,7 +215,7 @@ public class ZWaveActiveBinding extends AbstractActiveBinding<ZWaveBindingProvid
 			}		
 	
 	}
-
+	
 	@Override
 	protected void internalReceiveCommand(String itemName, Command command) {
 		// if we are not yet initialized, don't waste time and return
@@ -229,7 +230,10 @@ public class ZWaveActiveBinding extends AbstractActiveBinding<ZWaveBindingProvid
 			logger.debug("Got nodeId = {}, command = {}", provider.getZwaveData(itemName).getNodeId(),
 					provider.getZwaveData(itemName).getCommand());
 			String nodeIdString = provider.getZwaveData(itemName).getNodeId();
+			int endpoint = provider.getZwaveData(itemName).getEndpoint();
+			
 			logger.debug("nodeIdString = {}", nodeIdString);
+			logger.debug("endpoint = {}", endpoint);
 			
 			// TODO: Implement ZWaveNode NodeStage to ensure node information is complete
 			if (nodeIdString.equals("zwavejoin")) {
@@ -246,14 +250,18 @@ public class ZWaveActiveBinding extends AbstractActiveBinding<ZWaveBindingProvid
 					logger.debug("ZWaveController is connected");
 					if (command == OnOffType.ON) {
 						logger.debug("Sending ON");
-						this.zController.sendLevel(nodeId, 255);
+						this.zController.sendLevel(nodeId, endpoint, 255);
 					} else if (command == OnOffType.OFF) {
 						logger.debug("Sending OFF");
-						this.zController.sendLevel(nodeId, 0);					
-					//} else if (command instanceof PercentType) {
-					//	PercentType pt = (PercentType) command;
-					//	logger.debug("Sending PercentType, value " + pt.intValue());
-					//	this.zController.sendLevel(nodeId, pt.intValue());					
+						this.zController.sendLevel(nodeId, endpoint, 0);					
+					} else if (command instanceof PercentType) {
+						PercentType pt = (PercentType) command;
+						int value = pt.intValue();
+						if (value == 100) {
+							value = 99;
+						}
+						logger.debug("Sending PercentType, value " + value);
+						this.zController.sendLevel(nodeId, endpoint, value);
 					} else {
 						logger.warn("Unknown command >{}<", command.toString());
 					}
@@ -331,17 +339,17 @@ public class ZWaveActiveBinding extends AbstractActiveBinding<ZWaveBindingProvid
 		switch (event.getEventType()) {
 			case ZWaveEvent.SWITCH_EVENT:
 			case ZWaveEvent.DIMMER_EVENT:
-				logger.debug("Got a " + event.getEventType() + " event from Z-Wave network for nodeId = {}, state = {}", event.getNodeId(), event.getEventValue());
+				logger.debug("Got a " + event.getEventType() + " event from Z-Wave network for nodeId = {}, state = {}, endpoint = {}", new Object[] { event.getNodeId(), event.getEventValue(), event.getEndpoint() } );
 				for (ZWaveBindingProvider provider : providers) {
 					logger.info("Trying to find Item through {} provider", provider.toString());
 					for (String itemName : provider.getItemNames()) {
 						logger.info("Looking in {}", itemName);
 						ZWaveBindingConfig bindingConfig = provider.getZwaveData(itemName);
-						logger.info("{} {}", bindingConfig.getNodeId(), bindingConfig.getCommand());
+						logger.info("{} {} {}", new Object[] { bindingConfig.getNodeId(), bindingConfig.getCommand(), bindingConfig.getEndpoint() });
 						logger.info("{}", String.valueOf(event.getNodeId()));
 						try {
 							if (bindingConfig.getNodeId() != "zwavejoin") {
-								if (Integer.valueOf(bindingConfig.getNodeId()) == event.getNodeId()) {
+								if (Integer.valueOf(bindingConfig.getNodeId()) == event.getNodeId() && bindingConfig.getEndpoint() == event.getEndpoint()) {
 									logger.debug("NodeId match");
 									//if (bindingConfig.getCommandClass() == ZWaveCommandClass.SWITCH || bindingConfig.getCommandClass() == ZWaveCommandClass.DIMMER) {
 										//logger.debug("CommandClass match");
@@ -353,7 +361,7 @@ public class ZWaveActiveBinding extends AbstractActiveBinding<ZWaveBindingProvid
 										} else {
 											// dimmer value
 											logger.debug("Zwave Event Value not of type of ON or OFF.");
-											//eventPublisher.postUpdate(itemName, new PercentType(event.getEventValue()));
+											eventPublisher.postUpdate(itemName, new PercentType(event.getEventValue()));
 										}
 								}
 							}
