@@ -35,6 +35,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang.ArrayUtils;
 import org.slf4j.Logger;
@@ -54,122 +55,129 @@ import gnu.io.UnsupportedCommOperationException;
  * @author Brian Crosby
  * @since 1.3.0
  */
-
 public class SerialInterface {
 
-	public static final byte[] zwave_nak = new byte[] { 0x15 };
-	public static final byte[] zwave_ack = new byte[] { 0x06 };
-	public static final byte[] zwave_can = new byte[] { 0x18 };
+	private static final byte[] zwave_nak = new byte[] { 0x15 };
+	private static final byte[] zwave_ack = new byte[] { 0x06 };
+	private static final byte[] zwave_can = new byte[] { 0x18 };
 
 	private static int SOFCount = 0;
 	private static int CANCount = 0;
 	private static int NAKCount = 0;
 	private static int ACKCount = 0;
 	private static int OOFCount = 0;
-	private static int ACKWaiting = 0;
 	
 	public static final byte MessageTypeRequest = 0x00;
 	public static final byte MessageTypeResponse = 0x01;
-	public static final byte SOF = 0x01;
-	public static final byte ACK = 0x06;
-	public static final byte NAK = 0x15;
-	public static final byte CAN = 0x18; 
+	
+	private static final byte SOF = 0x01;
+	private static final byte ACK = 0x06;
+	private static final byte NAK = 0x15;
+	private static final byte CAN = 0x18; 
 
 	private static final Logger logger = LoggerFactory.getLogger(SerialInterface.class);
 	private SerialPort serialPort;
+	private int maxBufferSize = 1024;
+	private ArrayBlockingQueue<SerialMessage> outputQueue = new ArrayBlockingQueue<SerialMessage>(maxBufferSize, true);;
+    
+    private SerialInterfaceThread serialInterfaceThread;
+    private ArrayList<SerialInterfaceEventListener> eventListeners = new ArrayList<SerialInterfaceEventListener>();
+    
     private InputStream inputStream;
     private OutputStream outputStream;
-    protected int maxBufferSize = 1024;
-    protected ArrayBlockingQueue<SerialMessage> inputQueue = new ArrayBlockingQueue<SerialMessage>(maxBufferSize, true);
-    protected ArrayBlockingQueue<SerialMessage> outputQueue = new ArrayBlockingQueue<SerialMessage>(maxBufferSize, true);;
-    protected ArrayBlockingQueue<SerialMessage> sentQueue = new ArrayBlockingQueue<SerialMessage>(maxBufferSize, true);;
-    public boolean isWaitingResponse = false;
+    
     public int isWaitingResponseFromNode = 255;
-    private ArrayList<SerialInterfaceEventListener> eventListeners;
 
-    public SerialInterface(String serialPortName) {
+    /**
+     * Constructor. Creates a new instance of the SerialInterface class.
+     * @param serialPortName
+     * @throws SerialInterfaceException
+     */
+    public SerialInterface(String serialPortName) throws SerialInterfaceException {
+		this.connect(serialPortName);
+	}
+    
+    /**
+     * Connects to a serial port and starts listening and sending on the port.
+     * @param serialPortName
+     * @throws SerialInterfaceException
+     */
+    public void connect(String serialPortName) throws SerialInterfaceException {
 		logger.info("Initializing serial port " + serialPortName);
-		this.eventListeners = new ArrayList<SerialInterfaceEventListener>();
-		try {
+    	try {
 			CommPortIdentifier portIdentifier = CommPortIdentifier.getPortIdentifier(serialPortName);
 			CommPort commPort = portIdentifier.open("org.openhab.binding.zwave",2000);
 			serialPort = (SerialPort) commPort;
 			serialPort.setSerialPortParams(115200,SerialPort.DATABITS_8,SerialPort.STOPBITS_1,SerialPort.PARITY_NONE);
-			inputStream = serialPort.getInputStream();
-			outputStream = serialPort.getOutputStream();
+			this.inputStream = serialPort.getInputStream();
+			this.outputStream = serialPort.getOutputStream();
 			logger.info("Serial port is initialized");
-			outputStream.write(0x15);
-			outputStream.flush();
-			logger.info("NAK sent");
-			SerialInterfaceThread serialThread = new SerialInterfaceThread(this);
-			serialThread.start();
+			serialInterfaceThread = new SerialInterfaceThread(this);
+			serialInterfaceThread.start();
 		} catch (NoSuchPortException e) {
-			logger.error(e.getMessage());
+			logger.error(e.getLocalizedMessage());
+			throw new SerialInterfaceException(e.getLocalizedMessage(), e);
 		} catch (PortInUseException e) {
-			logger.error(e.getMessage());
+			logger.error(e.getLocalizedMessage());
+			throw new SerialInterfaceException(e.getLocalizedMessage(), e);
 		} catch (UnsupportedCommOperationException e) {
-			logger.error(e.getMessage());
+			logger.error(e.getLocalizedMessage());
+			throw new SerialInterfaceException(e.getLocalizedMessage(), e);
 		} catch (IOException e) {
-			logger.error(e.getMessage());
-		}
-	}
-
-    public void sendSimpleRequest(byte requestFunction) {
-    	SerialMessage newMessage = new SerialMessage(requestFunction, MessageTypeRequest);
-    	sendMessage(newMessage);
-    }
-    
-    public void sendMessage(SerialMessage message) {
-    	try {
-    		outputQueue.put(message);
-    		logger.debug("Message placed on queue. Current Size = {}", outputQueue.size());
-    	} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+			logger.error(e.getLocalizedMessage());
+			throw new SerialInterfaceException(e.getLocalizedMessage(), e);
 		}
     }
     
-    public void processIncomingMessage(byte[] buffer) {
-		//int sofOffset = 0;
-		//if (buffer[0] == 0x18) { // CAN received
-			// TODO: if CAN rx we need to send CAN back
-		//	return;
-		//}
-		
-		// What is this used for?
-		//for (int i=0; i<buffer.length; i++) {
-		//	if (buffer[i] == 0x01) {
-		//		sofOffset = i;
-		//		break;
-		//	}
-		//}
-		
-		SerialMessage serialMessage = new SerialMessage(buffer);
-		if (serialMessage.isValid) {
-			logger.info("Message is valid, sending ACK");
-			try {
-				outputStream.write(zwave_ack);
-				outputStream.flush();
-			} catch (IOException e) {
-				logger.error(e.getMessage());
-			}
-		} else {
-			logger.info("Message is not valid");
-			return;
-		}
-		for (SerialInterfaceEventListener eventListener : this.eventListeners) {
-			eventListener.SerialInterfaceIncomingMessage(serialMessage);
-		}
+    /**
+     * Disconnects connection to the serial port.
+     */
+    public void disconnect() {
+    	if (serialInterfaceThread != null) {
+    		serialInterfaceThread.interrupt();
+    		serialInterfaceThread = null;
+    	}
+    	if (serialPort != null) {
+    		serialPort.close();
+    		serialPort = null;
+    	}
+		logger.info("Serial port is disconnected");
     }
 
-	static public String bb2hex(byte[] bb) {
+    /**
+     * Converts a byte array to a hexadecimal string representation    
+     * @param bb
+     * @return string
+     */
+    static public String bb2hex(byte[] bb) {
 		String result = "";
 		for (int i=0; i<bb.length; i++) {
 			result = result + String.format("%02X ", bb[i]);
 		}
 		return result;
 	}
-	
+
+    /**
+     * Sends a simple request message
+     * @param requestFunction
+     */
+    public void sendSimpleRequest(byte requestFunction) {
+    	SerialMessage newMessage = new SerialMessage(requestFunction, MessageTypeRequest);
+    	sendMessage(newMessage);
+    }
+    
+    /**
+     * Places a message on the queue to send over the serial interface.
+     * @param message
+     */
+    public void sendMessage(SerialMessage message) {
+    	try {
+    		outputQueue.put(message);
+    		logger.debug("Message placed on queue. Current Size = {}", outputQueue.size());
+    	} catch (InterruptedException e) {
+		}
+    }
+    
 	public void addEventListener(SerialInterfaceEventListener serialInterfaceEventListener) {
 		this.eventListeners.add(serialInterfaceEventListener);
 	}
@@ -180,26 +188,23 @@ public class SerialInterface {
 
     private static class SerialInterfaceThread extends Thread {
     	private final Logger logger = LoggerFactory.getLogger(SerialInterfaceThread.class);
-        private InputStream inputStream;
-        private OutputStream outputStream;
-        private SerialInterface serialInterface;
+    	private SerialInterface serialInterface;
+        
     	private static final byte[] zwave_nak = new byte[] { 0x15 };
     	private static final byte[] zwave_ack = new byte[] { 0x06 };
-    	private static final byte[] zwave_can = new byte[] { 0x18 };
+    	//private static final byte[] zwave_can = new byte[] { 0x18 };
     	private boolean isReceiving = false;
     	private boolean isWaitingResponse = false;
     	private byte [] readBuffer = new byte[400];
 
         public SerialInterfaceThread(SerialInterface serialInterface) {
         	this.serialInterface = serialInterface;
-        	this.inputStream = serialInterface.inputStream;
-        	this.outputStream = serialInterface.outputStream;
         }
 
         private void sendAck() {
         	logger.debug("Sending ACK");
         	try {
-				this.outputStream.write(zwave_ack);
+				this.serialInterface.outputStream.write(zwave_ack);
 			} catch (IOException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
@@ -209,28 +214,76 @@ public class SerialInterface {
         private void sendNak() {
         	logger.debug("Sending NAK");
         	try {
-				this.outputStream.write(zwave_nak);
+				this.serialInterface.outputStream.write(zwave_nak);
 			} catch (IOException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
         }
+        
+        public void processIncomingMessage(byte[] buffer) {
+    		//int sofOffset = 0;
+    		//if (buffer[0] == 0x18) { // CAN received
+    			// TODO: if CAN rx we need to send CAN back
+    		//	return;
+    		//}
+    		
+    		// What is this used for?
+    		//for (int i=0; i<buffer.length; i++) {
+    		//	if (buffer[i] == 0x01) {
+    		//		sofOffset = i;
+    		//		break;
+    		//	}
+    		//}
+    		
+    		SerialMessage serialMessage = new SerialMessage(buffer);
+    		if (serialMessage.isValid) {
+    			logger.debug("Message is valid, sending ACK");
+    			try {
+    				this.serialInterface.outputStream.write(zwave_ack);
+    				this.serialInterface.outputStream.flush();
+    			} catch (IOException e) {
+    				logger.error(e.getMessage());
+    			}
+    		} else {
+    			logger.error("Message is not valid");
+    			return;
+    		}
+    		
+    		for (SerialInterfaceEventListener eventListener : this.serialInterface.eventListeners) {
+    			try {
+    				eventListener.SerialInterfaceIncomingMessage(serialMessage);
+    			} catch (Exception ex) {
+    			  logger.error("Got exception {} handling message", ex.getLocalizedMessage());
+				}
+			}
+        }
 
+        @Override
     	public void run() {
+        	
+        	try {
+				this.serialInterface.outputStream.write(0x15);
+	        	this.serialInterface.outputStream.flush();
+				logger.debug("NAK sent");
+			} catch (IOException e2) {
+				// TODO Auto-generated catch block
+				e2.printStackTrace();
+			}
+        	
     		byte nextByte = 0;
-    		int nextRead = -1;
     		int availableBytes = -1;
     		ByteArrayOutputStream bb = new ByteArrayOutputStream();
     		while (!this.isInterrupted()) {
     			try {
-					availableBytes = this.inputStream.available();
+					availableBytes = this.serialInterface.inputStream.available();
 				} catch (IOException e1) {
 					e1.printStackTrace();
 				}
     			if (availableBytes > 0) {
         			this.isReceiving = true;
 					try {
-						nextByte = (byte)this.inputStream.read();
+						nextByte = (byte)this.serialInterface.inputStream.read();
 					} catch (IOException e1) {
 						// TODO Auto-generated catch block
 						e1.printStackTrace();
@@ -239,8 +292,7 @@ public class SerialInterface {
     				if (nextByte == SOF) { // SOF
     					
     					if(this.isWaitingResponse){
-    						logger.info("Unsolicited message received while waiting for ACK.");
-    						ACKWaiting++;
+    						logger.warn("Unsolicited message received while waiting for ACK.");
     					}
     					
     					bb.write((byte)0x01);
@@ -254,29 +306,26 @@ public class SerialInterface {
     					try {
     						logger.debug("Reading message. In SOF.");
 							
-    						byte messageLength = (byte)this.inputStream.read();
+    						byte messageLength = (byte)this.serialInterface.inputStream.read();
 							bb.write(messageLength);
 							logger.debug("Message length will be {} bytes", messageLength);
 							logger.debug("Available Bytes {}", availableBytes);
 							
 							// why do this? inputStream.read() will throw -1 when it reached the end?
 							for (int i=0; i<messageLength-1; i++) {
-								nextByte = (byte)this.inputStream.read();
+								nextByte = (byte)this.serialInterface.inputStream.read();
 								bb.write(nextByte);
 							}
 							
-							byte messageChecksumm = (byte)this.inputStream.read();
+							byte messageChecksumm = (byte)this.serialInterface.inputStream.read();
 							bb.write(messageChecksumm);
 							logger.debug(String.format("Message read finished with checksumm = 0x%02X ", messageChecksumm));
-							logger.info("Message = " + this.serialInterface.bb2hex(bb.toByteArray()));
+							logger.debug("Message = " + SerialInterface.bb2hex(bb.toByteArray()));
 							
-							// TODO: need to check checksum before sending ACK! Why are we sending it here and also sending it when we process and check the checksum? Need to do it in the processing not here.
-							//sendAck();
-							this.serialInterface.processIncomingMessage(bb.toByteArray());
+							this.processIncomingMessage(bb.toByteArray());
 							bb.reset();
 						} catch (IOException e) {
-							// TODO Auto-generated catch block
-							e.printStackTrace();
+							logger.error("Got IOException while running serial interface thread: {}", e.getLocalizedMessage());
 						}
     				} else if (nextByte == ACK) { // ACK
     					logger.debug("Rx ACK");
@@ -304,27 +353,23 @@ public class SerialInterface {
     					logger.debug("Sending next message from output queue");
     					SerialMessage nextMessage = this.serialInterface.outputQueue.poll();
     					try {
-							this.outputStream.write(nextMessage.getMessageBuffer());
+    						byte[] buffer = nextMessage.getMessageBuffer();
+    						logger.debug("Message = " + SerialInterface.bb2hex(buffer));
+							this.serialInterface.outputStream.write(buffer);
 							this.isWaitingResponse = true;
 							this.serialInterface.isWaitingResponseFromNode = nextMessage.getMessageNode();
-							// TODO: isWaitingResponse should be set to true; set to false in processing of message if ACK was rx.
+														// TODO: isWaitingResponse should be set to true; set to false in processing of message if ACK was rx.
 						} catch (IOException e) {
-							// TODO Auto-generated catch block
-							e.printStackTrace();
+							logger.error("Got IOException while running serial interface thread: {}", e.getLocalizedMessage());
 						}
     				}
-    				// Commented out because it will write debug every 50 milliseconds
-    				//else {
-    				//	logger.debug("Nothing in queue to send or still waiting response!");
-    				//}
     			}
     			try {
 					Thread.sleep(50);
 				} catch (InterruptedException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
 				}
     		}
+    		logger.info("SerialInterfaceThread ended");
     	}
     }
 

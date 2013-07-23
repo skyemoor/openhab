@@ -24,15 +24,6 @@ import org.slf4j.LoggerFactory;
  * @author Brian Crosby
  * @since 1.3.0
  */
-
-/**
- * @author jws
- *
- */
-/**
- * @author jws
- *
- */
 public class ZWaveController implements SerialInterfaceEventListener {
 
 	public static final byte MessageSerialApiGetInitData = 0x02;

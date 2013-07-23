@@ -38,6 +38,7 @@ import org.openhab.binding.zwave.ZWaveBindingProvider;
 import org.openhab.binding.zwave.ZWaveCommandClass;
 import org.openhab.binding.zwave.ZWaveReportCommands;
 import org.openhab.binding.zwave.internal.protocol.SerialInterface;
+import org.openhab.binding.zwave.internal.protocol.SerialInterfaceException;
 import org.openhab.binding.zwave.internal.protocol.ZWaveController;
 import org.openhab.binding.zwave.internal.protocol.ZWaveEvent;
 import org.openhab.binding.zwave.internal.protocol.ZWaveEventListener;
@@ -51,6 +52,7 @@ import org.openhab.core.types.State;
 import org.openhab.core.types.UnDefType;
 import org.osgi.service.cm.ConfigurationException;
 import org.osgi.service.cm.ManagedService;
+import org.osgi.service.component.ComponentContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -80,12 +82,24 @@ public class ZWaveActiveBinding extends AbstractActiveBinding<ZWaveBindingProvid
 	public ZWaveActiveBinding() {
 	}
 
+	@Override
 	public void activate() {
-		logger.debug("activate()");
+		
 	}
 	
+	@Override
 	public void deactivate() {
-		logger.debug("deactivate()");
+		isZwaveNetworkReady = false;
+		if (zController != null) {
+			zController.removeEventListener(this);
+			this.zController = null;
+		}
+		if (this.serialInterface != null)
+		{
+			this.serialInterface.disconnect();
+			this.serialInterface = null;
+		}
+		
 	}
 
 	/**
@@ -109,7 +123,7 @@ public class ZWaveActiveBinding extends AbstractActiveBinding<ZWaveBindingProvid
 	 */
 	@Override
 	protected boolean isProperlyConfigured() {
-		return isProperlyConfigured;
+		return isProperlyConfigured;	
 	}
 
 	/**
@@ -120,7 +134,8 @@ public class ZWaveActiveBinding extends AbstractActiveBinding<ZWaveBindingProvid
 		
 		if(!isZwaveNetworkReady){
 			logger.debug("Zwave Network isn't ready yet!");
-			this.zController.checkForDeadOrSleepingNodes();
+			if (this.zController != null)
+				this.zController.checkForDeadOrSleepingNodes();
 			return;
 		}
 		
@@ -278,25 +293,37 @@ public class ZWaveActiveBinding extends AbstractActiveBinding<ZWaveBindingProvid
 	@Override
 	public void updated(Dictionary<String, ?> config) throws ConfigurationException {
 		if (config != null) {
-			String refreshIntervalString = (String) config.get("refresh");
-			if (StringUtils.isNotBlank(refreshIntervalString)) {
-				refreshInterval = Long.parseLong(refreshIntervalString);
-			}
-			String refreshDelayString = (String) config.get("refreshDelay");
-			if (StringUtils.isNotBlank(refreshDelayString)) {
-				refreshDelay = Integer.parseInt(refreshDelayString);
-			}
-			if (StringUtils.isNotBlank((String) config.get("port"))) {
-				port = (String) config.get("port");
-				logger.info("Update config, port = {}", port);
-				this.serialInterface = new SerialInterface(port);
-				this.zController = new ZWaveController(serialInterface);
-				zController.initialize();
-				zController.addEventListener(this);
-			}
-			isProperlyConfigured = true;
+				String refreshIntervalString = (String) config.get("refresh");
+				if (StringUtils.isNotBlank(refreshIntervalString)) {
+					try {
+						refreshInterval = Long.parseLong(refreshIntervalString);
+					} catch (NumberFormatException ex) {
+						throw new ConfigurationException("refresh", ex.getLocalizedMessage(), ex);
+					}
+				}
+				String refreshDelayString = (String) config.get("refreshDelay");
+				if (StringUtils.isNotBlank(refreshDelayString)) {
+					try {
+						refreshDelay = Integer.parseInt(refreshDelayString);
+					} catch (NumberFormatException ex) {
+						throw new ConfigurationException("refresh", ex.getLocalizedMessage(), ex);
+					}
+				}
+				if (StringUtils.isNotBlank((String) config.get("port"))) {
+					try {
+						port = (String) config.get("port");
+						logger.info("Update config, port = {}", port);
+						isProperlyConfigured = true;
+						this.deactivate();
+						this.serialInterface = new SerialInterface(port);
+						this.zController = new ZWaveController(serialInterface);
+						zController.initialize();
+						zController.addEventListener(this);
+					} catch (SerialInterfaceException ex) {
+						throw new ConfigurationException("port", ex.getLocalizedMessage(), ex);
+					}
+				}
 		}
-		
 	}
 
 	public String getPort() {
