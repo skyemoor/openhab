@@ -72,7 +72,7 @@ public class ZWaveGenericBindingProvider extends AbstractGenericBindingProvider 
 	@Override
 	public void validateItemType(Item item, String bindingConfig) throws BindingConfigParseException {
 		// All types are valid
-		logger.info("validateItemType({}, {})", item.getName(), bindingConfig);
+		logger.debug("validateItemType({}, {})", item.getName(), bindingConfig);
 	}
 
 	/**

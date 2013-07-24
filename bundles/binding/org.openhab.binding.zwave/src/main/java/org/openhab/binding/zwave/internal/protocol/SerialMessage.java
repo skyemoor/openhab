@@ -129,7 +129,7 @@ public class SerialMessage {
 		for (int i=1; i<buffer.length-1; i++) {
 			checkSumm = (byte) (checkSumm ^ buffer[i]);
 		}
-		logger.info(String.format("Calculated checksum = 0x%02X", checkSumm));
+		logger.debug(String.format("Calculated checksum = 0x%02X", checkSumm));
 		return checkSumm;
 	}
 

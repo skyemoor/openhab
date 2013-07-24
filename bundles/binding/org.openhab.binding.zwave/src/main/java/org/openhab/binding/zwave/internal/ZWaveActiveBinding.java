@@ -218,7 +218,7 @@ public class ZWaveActiveBinding extends AbstractActiveBinding<ZWaveBindingProvid
 									value = new StringType(String.format("%s", sdf.format(zNode.getLastUpdated()).toString() ));
 								}
 								else {
-									logger.info("ZWave Binding Reporting Type not supported! ZWave Report Command = {}", rCommand);
+									logger.warn("ZWave Binding Reporting Type not supported! ZWave Report Command = {}", rCommand);
 								}
 								eventPublisher.postUpdate(itemName, value);
 						
@@ -368,12 +368,12 @@ public class ZWaveActiveBinding extends AbstractActiveBinding<ZWaveBindingProvid
 			case ZWaveEvent.DIMMER_EVENT:
 				logger.debug("Got a " + event.getEventType() + " event from Z-Wave network for nodeId = {}, state = {}, endpoint = {}", new Object[] { event.getNodeId(), event.getEventValue(), event.getEndpoint() } );
 				for (ZWaveBindingProvider provider : providers) {
-					logger.info("Trying to find Item through {} provider", provider.toString());
+					logger.debug("Trying to find Item through {} provider", provider.toString());
 					for (String itemName : provider.getItemNames()) {
-						logger.info("Looking in {}", itemName);
+						logger.debug("Looking in {}", itemName);
 						ZWaveBindingConfig bindingConfig = provider.getZwaveData(itemName);
-						logger.info("{} {} {}", new Object[] { bindingConfig.getNodeId(), bindingConfig.getCommand(), bindingConfig.getEndpoint() });
-						logger.info("{}", String.valueOf(event.getNodeId()));
+						logger.debug("{} {} {}", new Object[] { bindingConfig.getNodeId(), bindingConfig.getCommand(), bindingConfig.getEndpoint() });
+						logger.debug("{}", String.valueOf(event.getNodeId()));
 						try {
 							if (bindingConfig.getNodeId() != "zwavejoin") {
 								if (Integer.valueOf(bindingConfig.getNodeId()) == event.getNodeId() && bindingConfig.getEndpoint() == event.getEndpoint()) {
