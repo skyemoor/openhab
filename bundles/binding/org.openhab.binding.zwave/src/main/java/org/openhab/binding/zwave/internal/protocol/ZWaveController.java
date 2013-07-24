@@ -268,8 +268,8 @@ public class ZWaveController implements SerialInterfaceEventListener {
 		// buffer[0] SOF, CAN, NAK, ACK handled in SerialInterface Thread
 		// TODO: validate handling of above
 		
-		logger.info("Incoming message to process");
-		logger.info(SerialInterface.bb2hex(incomingMessage.getMessagePayload()));
+		logger.debug("Incoming message to process");
+		logger.debug(SerialInterface.bb2hex(incomingMessage.getMessagePayload()));
 		
 		// TODO: implement handlers for each of the message types
 		if (incomingMessage.getMessageType() == SerialInterface.MessageTypeResponse) {
@@ -277,28 +277,28 @@ public class ZWaveController implements SerialInterfaceEventListener {
 			// We set the isWaitingResponse within the SerialInterface; this is a function of the Serial Protocol not Zwave.
 			//this.serialInterface.isWaitingResponse = false;
 			
-			logger.info("Message type = RESPONSE");
+			logger.debug("Message type = RESPONSE");
 			switch (incomingMessage.getMessageClass()) {
 				case MessageGetVersion:
 					int libraryType = incomingMessage.getMessagePayload()[12];
 					String version = new String(ArrayUtils.subarray(incomingMessage.getMessagePayload(), 0, 11));
-					logger.info(String.format("Got MessageGetVersion response. Version = %s, Library Type = 0x%02X", version, libraryType));
+					logger.debug(String.format("Got MessageGetVersion response. Version = %s, Library Type = 0x%02X", version, libraryType));
 					this.setZWaveVersion(version);
 					this.setZWaveLibraryType(libraryType);
 					break;
 				case MessageGetRandom:
-					logger.info(String.format("Got MessageGetRandom response."));
+					logger.debug(String.format("Got MessageGetRandom response."));
 					handleMessageGetRandomResponse(incomingMessage);
 					break;
 				case MessageMemoryGetId:
 					int homeId = ((incomingMessage.getMessagePayload()[0] & 0xff) << 24) | ((incomingMessage.getMessagePayload()[1] & 0xff) << 16) | ((incomingMessage.getMessagePayload()[2] & 0xff) << 8) | (incomingMessage.getMessagePayload()[3] & 0xff);
 					int selfNodeId = incomingMessage.getMessagePayload()[4];
-					logger.info(String.format("Got MessageMemoryGetId response. Home id = 0x%08X, Node id = %d", homeId, selfNodeId));
+					logger.debug(String.format("Got MessageMemoryGetId response. Home id = 0x%08X, Node id = %d", homeId, selfNodeId));
 					this.setHomeId(homeId);
 					this.setSelfNodeId(selfNodeId);
 					break;
 				case MessageSerialApiGetInitData:
-					logger.info(String.format("Got MessageSerialApiGetInitData response."));
+					logger.debug(String.format("Got MessageSerialApiGetInitData response."));
 					this.connected = true;
 					if (incomingMessage.getMessagePayload()[2] == 29) {
 						byte nodeId = 1;
@@ -324,160 +324,160 @@ public class ZWaveController implements SerialInterfaceEventListener {
 					}
 					break;
 				case MessageIdentifyNode:
-					logger.info(String.format("Got MessageIdentifyNode response."));
+					logger.debug(String.format("Got MessageIdentifyNode response."));
 					handleMessageGetNodeProtcolInfoResponse(incomingMessage);
 					break;
 				case MessageReplicationSendData:
-					logger.info(String.format("Got MessageReplicationSendData response."));
+					logger.debug(String.format("Got MessageReplicationSendData response."));
 					// TODO: Implement MessageReplicationSendData handler
 					break;
 				case MessageAssignReturnRoute:
-					logger.info(String.format("Got MessaeAssignReturnRoute response."));
+					logger.debug(String.format("Got MessaeAssignReturnRoute response."));
 					handleMessageAssignReturnRouteResponse(incomingMessage);
 					break;
 				case MessageDeleteReturnRoute:
-					logger.info(String.format("Got MessaeAssignReturnRoute response."));
+					logger.debug(String.format("Got MessaeAssignReturnRoute response."));
 					handleMessageDeleteReturnRouteResponse(incomingMessage);
 					break;
 				case MessageSerialApiGetCapabilities:
-					logger.info(String.format("Got MessageSerialApiGetCapabilities response."));
+					logger.debug(String.format("Got MessageSerialApiGetCapabilities response."));
 					handleMessageSerialAPIGetCapabilitiesResponse(incomingMessage);
 					break;
 				case MessageSerialApiSoftReset:
-					logger.info(String.format("Got MessageSerialApiSoftReset response."));
+					logger.debug(String.format("Got MessageSerialApiSoftReset response."));
 					handleMessageSerialAPISoftResetResponse(incomingMessage);
 					break;
 				case MessageGetSucNodeId:
-					logger.info(String.format("Got MessageGetSucNodeId response. SUC Node Id = %d", incomingMessage.getMessagePayload()[0]));
+					logger.debug(String.format("Got MessageGetSucNodeId response. SUC Node Id = %d", incomingMessage.getMessagePayload()[0]));
 					handleMessageGetSUCNodeIDResponse(incomingMessage);
 					break;
 				case MessageEnableSuc:
-					logger.info(String.format("Got MessageEnableSUC response."));
+					logger.debug(String.format("Got MessageEnableSUC response."));
 					handleMessageEnableSUCResponse(incomingMessage);
 					break;
 				case MessageSetSucNodeID:
-					logger.info(String.format("Got MessageSetSUCNodeID response."));
+					logger.debug(String.format("Got MessageSetSUCNodeID response."));
 					handleMessageSetSUCNodeIDResponse(incomingMessage);
 					break;
 				case MessageSendData:
-					logger.info(String.format("Got MessageSendData response."));
+					logger.debug(String.format("Got MessageSendData response."));
 					handleMessageSendDataResponse(incomingMessage);
 					break;
 				case MessageGetControllerCapabilities:
-					logger.info(String.format("Got MessageGetControllerCapabilities response."));
+					logger.debug(String.format("Got MessageGetControllerCapabilities response."));
 					handleMessageGetControllerCapabilitiesResponse(incomingMessage);
 					break;
 				case MessageRequestNetworkUpdate:
-					logger.info(String.format("Got MessageRequestNetworkUpdate response."));
+					logger.debug(String.format("Got MessageRequestNetworkUpdate response."));
 					// TODO: Implement MessageRequestNetworkUpdate Handler
 					break;
 				case MessageRequestNodeInfo:
-					logger.info(String.format("Got MessageRequestNodeInfo response."));
+					logger.debug(String.format("Got MessageRequestNodeInfo response."));
 					// TODO: Implement Handler for MessageRequestNodeInfo
 					break;
 				case MessageRemoveFailedNodeID:
-					logger.info(String.format("Got MessageRemoveFailedNodeID response."));
+					logger.debug(String.format("Got MessageRemoveFailedNodeID response."));
 					handleMessageRemoveFailedNodeIDResponse(incomingMessage);
 					break;
 				case MessageIsFailedNodeID:
-					logger.info(String.format("Got MessageIsFailedNodeID response."));
+					logger.debug(String.format("Got MessageIsFailedNodeID response."));
 					handleMessageIsFailedNodeIDResponse(incomingMessage);
 					break;
 				case MessageReplaceFailedNode:
-					logger.info(String.format("Got MessageReplaceFailedNode response."));
+					logger.debug(String.format("Got MessageReplaceFailedNode response."));
 					handleMessageReplaceFailedNodeResponse(incomingMessage);
 					break;
 				case MessageRfPowerLevelSet:
-					logger.info(String.format("Got MessageRfPowerLevelSet response."));
+					logger.debug(String.format("Got MessageRfPowerLevelSet response."));
 					handleMessageRFPowerLevelSetResponse(incomingMessage);
 					break;
 				case MessageReadMemory:
-					logger.info(String.format("Got MessageReadMemory response."));
+					logger.debug(String.format("Got MessageReadMemory response."));
 					handleMessageReadMemoryResponse(incomingMessage);
 					break;
 				case MessageSerialApiSetTimeouts:
-					logger.info(String.format("Got MessageSerialApiSetTimeouts response."));
+					logger.debug(String.format("Got MessageSerialApiSetTimeouts response."));
 					handleMessageSerialAPISetTimeoutsResponse(incomingMessage);
 					break;
 				case MessageMemoryGetByte:
-					logger.info(String.format("Got MessageMemoryGetByte response."));
+					logger.debug(String.format("Got MessageMemoryGetByte response."));
 					handleMessageMemoryGetByteResponse(incomingMessage);
 					break;
 				default:
-					logger.info(String.format("TODO: Implement processing of Response Message = 0x%02X", incomingMessage.getMessageClass()));
+					logger.warn(String.format("TODO: Implement processing of Response Message = 0x%02X", incomingMessage.getMessageClass()));
 					break;
 				}
 		} else if (incomingMessage.getMessageType() == SerialInterface.MessageTypeRequest) {
-			logger.info("Message type = REQUEST");
+			logger.debug("Message type = REQUEST");
 			switch (incomingMessage.getMessageClass()) {
 				case MessageApplicationCommandHandler:
-					logger.info(String.format("MessageApplicationCommandHandler request."));
+					logger.debug(String.format("MessageApplicationCommandHandler request."));
 					handleMessageApplicationCommandRequest(incomingMessage);
 					break;
 				case MessageSendData:
-					logger.info(String.format("MessageSendData request."));
+					logger.debug(String.format("MessageSendData request."));
 					handleMessageSendDataRequest(incomingMessage);
 					break;
 				case MessageReplicationCommandComplete:
-					logger.info(String.format("MessageReplicationCommandComplete request."));
+					logger.debug(String.format("MessageReplicationCommandComplete request."));
 					// TODO: Implement ReplicationCommandComplete Handler
 					break;
 				case MessageSendNodeInfo:
-					logger.info(String.format("MessageSendNodeInfo request."));
+					logger.debug(String.format("MessageSendNodeInfo request."));
 					handleMessageSendNodeInformationRequest(incomingMessage);
 					break;
 				case MessageRequestNodeNeighborUpdate:
 				case MessageRequestNodeNeighborUpdateOptions:
-					logger.info(String.format("MessageRequestNodeNeighborUpdate request."));
+					logger.debug(String.format("MessageRequestNodeNeighborUpdate request."));
 					handleMessageNodeNeighborUpdateRequest(incomingMessage);
 					break;
 				case MessageApplicationUpdate:
-					logger.info(String.format("MessageApplicationUpdate request."));
+					logger.debug(String.format("MessageApplicationUpdate request."));
 					handleMessageApplicationUpdateRequest(incomingMessage);
 					break;
 				case MessageAddNodeToNetwork:
-					logger.info(String.format("MessageAddNodeToNetwork request."));
+					logger.debug(String.format("MessageAddNodeToNetwork request."));
 					handleMessageAddNodeToNetworkRequest(incomingMessage);
 					break;
 				case MessageRemoveNodeFromNetwork:
-					logger.info(String.format("MessageRemoveNodeFromNetwork request."));
+					logger.debug(String.format("MessageRemoveNodeFromNetwork request."));
 					handleMessageRemoveNodeFromNetworkRequest(incomingMessage);
 					break;
 				case MessageCreateNewPrimary:
-					logger.info(String.format("MessageCreateNewPrimary request."));
+					logger.debug(String.format("MessageCreateNewPrimary request."));
 					handleMessageCreateNewPrimaryRequest(incomingMessage);
 					break;
 				case MessageControllerChange:
-					logger.info(String.format("MessageControllerChange request."));
+					logger.debug(String.format("MessageControllerChange request."));
 					handleMessageControllerChangeRequest(incomingMessage);
 					break;
 				case MessageSetLearnMode:
-					logger.info(String.format("MessageSetLearnMode request."));
+					logger.debug(String.format("MessageSetLearnMode request."));
 					handleMessageSetLearnModeRequest(incomingMessage);
 					break;
 				case MessageRequestNetworkUpdate:
-					logger.info(String.format("MessageRequestNetworkUpdate request."));
+					logger.debug(String.format("MessageRequestNetworkUpdate request."));
 					handleMessageNetworkUpdateRequest(incomingMessage);
 					break;
 				case MessageRemoveFailedNodeID:
-					logger.info(String.format("MessageRemoveFailedNodeID request."));
+					logger.debug(String.format("MessageRemoveFailedNodeID request."));
 					handleMessageRemoveFailedNodeRequest(incomingMessage);
 					break;
 				case MessageReplaceFailedNode:
-					logger.info(String.format("MessageReplaceFailedNode request."));
+					logger.debug(String.format("MessageReplaceFailedNode request."));
 					handleMessageReplaceFailedNodeRequest(incomingMessage);
 					break;
 				case MessageSetDefault:
-					logger.info(String.format("MessageSetDefault request."));
+					logger.debug(String.format("MessageSetDefault request."));
 					// TODO: Implement MessageSetDefault Handler
 					break;
 			default:
-				logger.info(String.format("TODO: Implement processing of Request Message = 0x%02X", incomingMessage.getMessageClass()));
+				logger.warn(String.format("TODO: Implement processing of Request Message = 0x%02X", incomingMessage.getMessageClass()));
 				break;
 			}
 		}
 		else {
-			logger.debug("Unsupoorted incomingMessageType: 0x%02X", incomingMessage.getMessageType());
+			logger.warn("Unsupported incomingMessageType: 0x%02X", incomingMessage.getMessageType());
 		}
 		
 		if (handleCallback){
@@ -546,31 +546,31 @@ public class ZWaveController implements SerialInterfaceEventListener {
 	}
 
 	private void handleMessageSerialAPIResetRequest(SerialMessage message) {
-		logger.info("Handle Message Serial API Reset Request.");
+		logger.debug("Handle Message Serial API Reset Request.");
 	}
     
     private void handleMessageNetworkUpdateRequest(SerialMessage message) {
-		logger.info("Handle Message Network Update Request.");
+		logger.debug("Handle Message Network Update Request.");
 	}
     
     private void handleMessageRemoveFailedNodeRequest(SerialMessage message) {
-		logger.info("Handle Message Remove Failed Node Request.");
+		logger.debug("Handle Message Remove Failed Node Request.");
 	}
     
     private void handleMessageNetworkUpdateResponse(SerialMessage message) {
-		logger.info("Handle Message Send Node Information Request.");
+		logger.debug("Handle Message Send Node Information Request.");
 	}
 	
 	private void handleMessageSendNodeInformationRequest(SerialMessage message) {
-		logger.info("Handle Message Send Node Information Request.");
+		logger.debug("Handle Message Send Node Information Request.");
 	}
     
     private void handleMessageSerialAPIGetInitDataResponse(SerialMessage message){
-		logger.info("Handle Message Serial API Get Init Data Response");
+		logger.debug("Handle Message Serial API Get Init Data Response");
 	}
 	
 	private void handleMessageGetControllerCapabilitiesResponse(SerialMessage message){
-		logger.info("Handle Get Controller Capabilities Response");
+		logger.debug("Handle Get Controller Capabilities Response");
 		
 		// Controller Capabilities = message.type
 		logger.debug(String.format("Controller Capabilities response. Cap=%d", message.getMessageType()));
@@ -578,7 +578,7 @@ public class ZWaveController implements SerialInterfaceEventListener {
 	}
 	
 	private void handleMessageSerialAPIGetCapabilitiesResponse(SerialMessage message){
-		logger.info("Handle Message Serial API Get Capabilities");
+		logger.debug("Handle Message Serial API Get Capabilities");
 		
 		this.setSerialAPIVersion(String.format("%d.%d", message.getMessagePayload()[0], message.getMessagePayload()[1]));
 		this.setManufactureId(((message.getMessagePayload()[2] & 0xff) << 8) | (message.getMessagePayload()[3] & 0xff));
@@ -590,10 +590,10 @@ public class ZWaveController implements SerialInterfaceEventListener {
 		//int deviceType = ((message.getMessagePayload()[4] & 0xff) << 8) | (message.getMessagePayload()[5] & 0xff);	
 		//int deviceId = ((message.getMessagePayload()[6] & 0xff) << 8) | (message.getMessagePayload()[7] & 0xff);	
 		
-		logger.info(String.format("API Version = %s", this.getSerialAPIVersion()));
-		logger.info(String.format("Manufacture ID = 0x%x", this.getManufactureId()));
-		logger.info(String.format("Device Type = 0x%x", this.getDeviceType()));
-		logger.info(String.format("Device ID = 0x%x", this.getDeviceId()));
+		logger.debug(String.format("API Version = %s", this.getSerialAPIVersion()));
+		logger.debug(String.format("Manufacture ID = 0x%x", this.getManufactureId()));
+		logger.debug(String.format("Device Type = 0x%x", this.getDeviceType()));
+		logger.debug(String.format("Device ID = 0x%x", this.getDeviceId()));
 		
 		// Ready to get information on Serial API		
 		this.serialInterface.sendSimpleRequest(MessageSerialApiGetInitData);
@@ -608,28 +608,28 @@ public class ZWaveController implements SerialInterfaceEventListener {
 	}
 	
 	private void handleMessageSerialAPISoftResetResponse(SerialMessage message){
-		logger.info("Handle Message Serial API Soft Reset");
+		logger.debug("Handle Message Serial API Soft Reset");
 	}
 	
 	private void handleMessageSendDataResponse(SerialMessage message){
-		logger.info("Handle Message Send Data Response");
+		logger.debug("Handle Message Send Data Response");
 		
 		if(message.getMessageBuffer()[2] != 0x00)
-			logger.info("Send Data successfully placed on stack.");
+			logger.debug("Send Data successfully placed on stack.");
 		else
-			logger.info("Send Data was not placed on stack due to error.");
+			logger.error("Send Data was not placed on stack due to error.");
 		
 	}
 	
 	private void handleMessageSendDataRequest(SerialMessage message){
-		logger.info("Handle Message Send Data Request");
+		logger.debug("Handle Message Send Data Request");
 	}
 	
 	private void handleManufactureSpecificRequest(SerialMessage message) {
-		logger.info("Handle Message Manufacture Specific Request");
+		logger.debug("Handle Message Manufacture Specific Request");
 		
 		int nodeId = message.getMessagePayload()[1];
-		logger.debug(String.format("Recieved ManufactureSpcific Information for Node ID = %d", nodeId));
+		logger.debug(String.format("Received ManufactureSpcific Information for Node ID = %d", nodeId));
 		
 		if(message.getMessagePayload()[4] == ZWaveCommandClass.COMMAND_CLASS_MANUFACTURER_SPECIFIC.REPORT.getCommand()){
 			logger.debug("Process Manufacturer Specific Report");
@@ -656,22 +656,22 @@ public class ZWaveController implements SerialInterfaceEventListener {
 	}
 	
 	private void handleMessageGetVersionResponse(SerialMessage message){
-		logger.info("Handle Message Get Version");
+		logger.debug("Handle Message Get Version");
 	}
 	
 	private void handleMessageGetRandomResponse(SerialMessage message){
-		logger.info("Handle Message Get Random");
+		logger.debug("Handle Message Get Random");
 	}
 	
 	private void handleMessageMemoryGetIDResponse(SerialMessage message){
-		logger.info("Handle Message Memory Get ID");
+		logger.debug("Handle Message Memory Get ID");
 	}
 	
 	private void handleMessageGetNodeProtcolInfoResponse(SerialMessage message){
-		logger.info("Handle Message Get Node ProtocolInfo Response");
+		logger.debug("Handle Message Get Node ProtocolInfo Response");
 		
 		int nodeId = this.serialInterface.isWaitingResponseFromNode;
-		logger.info("Current Message Node = " + nodeId);
+		logger.debug("Current Message Node = " + nodeId);
 		
 		this.zwaveNodes.get(nodeId).setHomeId(this.homeId);
 		
@@ -732,23 +732,23 @@ public class ZWaveController implements SerialInterfaceEventListener {
 	//}
 	
 	private void handleMessageAssignReturnRouteResponse(SerialMessage message){
-		logger.info("Handle Message Assign Return Route Response");
+		logger.debug("Handle Message Assign Return Route Response");
 	}
 	
 	private void handleMessageAssignReturnRouteRequest(SerialMessage message){
-		logger.info("Handle Message Assign Return Route Request");
+		logger.debug("Handle Message Assign Return Route Request");
 	}
 	
 	private void handleMessageDeleteReturnRouteResponse(SerialMessage message){
-		logger.info("Handle Message Delete Return Route Response");
+		logger.debug("Handle Message Delete Return Route Response");
 	}
 	
 	private void handleMessageDeleteReturnRouteRequest(SerialMessage message){
-		logger.info("Handle Message Delete Return Route Request");
+		logger.debug("Handle Message Delete Return Route Request");
 	}
 	
 	private void handleMessageEnableSUCResponse(SerialMessage message){
-		logger.info("Handle Message Enable SUC Response");
+		logger.debug("Handle Message Enable SUC Response");
 	}
 	
 	//private void handleMessageRequestNetworkUpdate(byte[] messagePayload, byte messageType){
@@ -756,11 +756,11 @@ public class ZWaveController implements SerialInterfaceEventListener {
 	//}
 	
 	private void handleMessageSetSUCNodeIDResponse(SerialMessage message){
-		logger.info("Handle Message Set SUC Node ID Resposne");
+		logger.debug("Handle Message Set SUC Node ID Resposne");
 	}
 	
 	private void handleMessageGetSUCNodeIDResponse(SerialMessage message){
-		logger.info("Handle Message Get SUC Node ID Response");
+		logger.debug("Handle Message Get SUC Node ID Response");
 	}
 	
 	//private void handleMessageRequestNodeInfo(byte[] messagePayload){
@@ -772,108 +772,108 @@ public class ZWaveController implements SerialInterfaceEventListener {
 	//}
 	
 	private void handleMessageNodeNeighborUpdateRequest(SerialMessage message){
-		logger.info("Handle Message Serial API Get Init Data Request");
+		logger.debug("Handle Message Serial API Get Init Data Request");
 	}
 	
 	private void handleMessageApplicationUpdateRequest(SerialMessage message){
-		logger.info("Handle Message Application Update Request");
+		logger.debug("Handle Message Application Update Request");
 		
 		//TODO: Zwave devices with a remote control do not report this update. Figure out how to handle.
 		
 				
-		logger.info("Application Update Request from Node {}" + message.getMessagePayload()[1]);
+		logger.debug("Application Update Request from Node {}" + message.getMessagePayload()[1]);
 		
 		switch (message.getMessagePayload()[0]){
 		case (byte) 0x84:
 			// Update Node Info; something changed
-			logger.info("Application update request, updating node info.");
+			logger.debug("Application update request, updating node info.");
 			requestLevel(message.getMessagePayload()[1], 1);
 			break;
 		case (byte) 0x82:
-			logger.info("Application update request, need to handle Node Info Request Done.");
+			logger.debug("Application update request, need to handle Node Info Request Done.");
 			break;
 		case (byte) 0x81:
-			logger.info("Application update request, need to handle Node Info Request Failed.");
+			logger.debug("Application update request, need to handle Node Info Request Failed.");
 			break;
 		case (byte) 0x80:
-			logger.info("Application update request, need to handle Node Infor Request Pending.");
+			logger.debug("Application update request, need to handle Node Infor Request Pending.");
 			break;
 		default:
-			logger.debug("TODO: Implement Application Update Request Handleing of {}." + message.getMessagePayload()[0]);
+			logger.warn("TODO: Implement Application Update Request Handling of {}." + message.getMessagePayload()[0]);
 		}
 		
 	}
 	
 	private void handleMessageAddNodeToNetworkRequest(SerialMessage message){
-		logger.info("Handle Message Add Node To Network Request");
+		logger.debug("Handle Message Add Node To Network Request");
 	}
 	
 	private void handleMessageRemoveNodeFromNetworkRequest(SerialMessage message){
-		logger.info("Handle Message Remove Node From Network Request");
+		logger.debug("Handle Message Remove Node From Network Request");
 	}
 	
 	private void handleMessageCreateNewPrimaryRequest(SerialMessage message){
-		logger.info("Handle Message Create new Primary Request");
+		logger.debug("Handle Message Create new Primary Request");
 	}
 	
 	private void handleMessageControllerChangeRequest(SerialMessage message){
-		logger.info("Handle Message Controller Change");
+		logger.debug("Handle Message Controller Change");
 	}
 	
 	private void handleMessageSetLearnModeRequest(SerialMessage message){
-		logger.info("Handle Message Set Learn Mode Request");
+		logger.debug("Handle Message Set Learn Mode Request");
 	}
 	
 	private void handleMessageRemoveFailedNodeIDResponse(SerialMessage messaged){
-		logger.info("Handle Message Remove Failed Node ID");
+		logger.debug("Handle Message Remove Failed Node ID");
 	}
 	
 	private void handleMessageIsFailedNodeIDResponse(SerialMessage message){
-		logger.info("Handle Message Is Failed Node ID");
+		logger.debug("Handle Message Is Failed Node ID");
 	}
 	
 	private void handleMessageReplaceFailedNodeResponse(SerialMessage message){
-		logger.info("Handle Message Replace Failed Node Response");
+		logger.debug("Handle Message Replace Failed Node Response");
 	}
 	
 	private void handleMessageReplaceFailedNodeRequest(SerialMessage message){
-		logger.info("Handle Message Replace Failed Node Request");
+		logger.debug("Handle Message Replace Failed Node Request");
 	}
 	
 	private void handleMessageGetRoutingInfoResponse(SerialMessage message){
-		logger.info("Handle Message Get Routing Info");
+		logger.debug("Handle Message Get Routing Info");
 	}
 	
 	private void handleMessageRFPowerLevelSetResponse(SerialMessage message){
-		logger.info("Handle Message RF Power Level Set Response");
+		logger.debug("Handle Message RF Power Level Set Response");
 	}
 	
 	private void handleMessageReadMemoryResponse(SerialMessage message){
-		logger.info("Handle Message Read Memory Response");
+		logger.debug("Handle Message Read Memory Response");
 	}
 	
 	private void handleMessageSerialAPISetTimeoutsResponse(SerialMessage message){
-		logger.info("Handle Message Serial API Set Timeouts Response");
+		logger.debug("Handle Message Serial API Set Timeouts Response");
 	}
 	
 	private void handleMessageMemoryGetByteResponse(SerialMessage message){
-		logger.info("Handle Message Memory Get Byte Response");
+		logger.debug("Handle Message Memory Get Byte Response");
 	}
 	
 	private void handleMessageGetVirtualNodesResponse(SerialMessage message){
-		logger.info("Handle Message Get Virtual Nodes Response");
+		logger.debug("Handle Message Get Virtual Nodes Response");
 	}
 	
 	private void handleMessageSetSlaveLearnModeResponse(SerialMessage message){
-		logger.info("Handle Message Set Slave Learn Mode Response");
+		logger.debug("Handle Message Set Slave Learn Mode Response");
 	}
 	
 	private void handleMessageSetSlaveLearnModeRequest(SerialMessage message){
-		logger.info("Handle Message Set Slave Learn Mode Request");
+		logger.debug("Handle Message Set Slave Learn Mode Request");
 	}
 	
 	private void handleMessageSendSlaveNodeInfoRequest(SerialMessage message){
-		logger.info("Handle Message Send Slave Node Info Request");
+		logger.debug("Handle Message Send Slave Node Info Request");
 	}
 
 	/**
@@ -893,30 +893,30 @@ public class ZWaveController implements SerialInterfaceEventListener {
 	 * @offset to start processing in the serial message
 	 */
 	private void handleMessageApplicationCommandRequest(SerialMessage message, int sourceNodeId, int endpoint, int offset){
-		logger.info("Handle Message Application Command Request");
+		logger.debug("Handle Message Application Command Request");
 		
 		byte commandClass = message.getMessagePayload()[3 + offset];
 		// Update last time this node was updated
 		this.zwaveNodes.get(sourceNodeId).setLastUpdated(Calendar.getInstance().getTime());
-		logger.info(String.format("Got MessageApplicationCommandHandler for Source Node = %d and CommandClass = 0x%02X", sourceNodeId, commandClass));
+		logger.debug(String.format("Got MessageApplicationCommandHandler for Source Node = %d and CommandClass = 0x%02X", sourceNodeId, commandClass));
 		// TODO: update to handle all supported CommandClasses
 		switch (commandClass) {
 			case CommandClassSwitchBinary:
 			case CommandClassMultiLevelRemoteSwitch:
 			case CommandClassBasic:
 				int eventType = commandClass == CommandClassSwitchBinary ? ZWaveEvent.SWITCH_EVENT : ZWaveEvent.DIMMER_EVENT;
-				logger.info("Got CommandClassSwitchBinary or CommandClassMultiLevelRemoteSwitch");
+				logger.debug("Got CommandClassSwitchBinary or CommandClassMultiLevelRemoteSwitch");
 				byte switchBinaryCmd = message.getMessagePayload()[4 + offset];
 				switch (switchBinaryCmd) {
 					case SwitchBinaryCmdSet:
-						logger.info("SwitchBinary set");
+						logger.debug("SwitchBinary set");
 						break;
 					case SwitchBinaryCmdGet:
-						logger.info("SwitchBinary get");
+						logger.debug("SwitchBinary get");
 						break;
 					case SwitchBinaryCmdReport:
 						int switchValue = message.getMessagePayload()[5 + offset] & 0xFF; //handle signed to unsigned conversion 
-						logger.info(String.format("SwitchBinary report from nodeId = %d, value = 0x%02X", sourceNodeId, switchValue));
+						logger.debug(String.format("SwitchBinary report from nodeId = %d, value = 0x%02X", sourceNodeId, switchValue));
 						String switchValueString = "";
 						if (switchValue == 0) {
 							switchValueString = "OFF";
@@ -930,52 +930,52 @@ public class ZWaveController implements SerialInterfaceEventListener {
 						this.notifyEventListeners(zEvent);
 						break;
 					default:
-						logger.info("Unknown SwitchBinary command");
+						logger.warn("Unknown SwitchBinary command");
 						break;
 					}
 				break;
 			case CommandClassMultiInstance:
-				logger.info("Got CommandClassMultiInstance");
+				logger.debug("Got CommandClassMultiInstance");
 				if (endpoint == 1) {
 					byte multiInstanceCmd = message.getMessagePayload()[4];
 					
 					switch  (multiInstanceCmd)
 					{
 						case MultiInstanceCmdEncap:
-							logger.info("Encapsulated Instance command");
+							logger.debug("Encapsulated Instance command");
 							endpoint = message.getMessagePayload()[5] & 0x7F;
 							handleMessageApplicationCommandRequest(message, sourceNodeId, endpoint, 3);
 							break;
 						case MultiChannelCmdEncap:
-							logger.info("Encapsulated Channel command");
+							logger.debug("Encapsulated Channel command");
 							endpoint = message.getMessagePayload()[5] & 0x7F;
 							handleMessageApplicationCommandRequest(message, sourceNodeId, endpoint, 4);
 							break;
 					}
 				} else
 				{
-					logger.debug("Unsupported nested MultiInstance command: 0x%02X", message.getMessageType());
+					logger.warn("Unsupported nested MultiInstance command: 0x%02X", message.getMessageType());
 				}
 				break;
 			case CommandClassMeter:
-				logger.info("Got CommandClassMeter");
+				logger.debug("Got CommandClassMeter");
 				break;
 			case 0x72:
-				logger.info("Got Message for Command Class Manuf. Specific");
+				logger.debug("Got Message for Command Class Manuf. Specific");
 				handleManufactureSpecificRequest(message);
 				break;
 			default:
-				logger.info(String.format("TODO: Implement processing of CommandClass = 0x%02X", commandClass));
+				logger.warn(String.format("TODO: Implement processing of CommandClass = 0x%02X", commandClass));
 				break;
 		}	
 	}
 	
 	private void handleMessageApplicationSlaveCommandRequest(SerialMessage message){
-		logger.info("Handle Message Application Slave Command Request");
+		logger.debug("Handle Message Application Slave Command Request");
 	}
 	
 	private void handleMessagePromiscuousAppplicationCommandRequest(SerialMessage message){
-		logger.info("Handle Message Promiscuous Application Command Request");
+		logger.debug("Handle Message Promiscuous Application Command Request");
 	}
 	
 	//private void handleMessageSetDefault(byte[] messagePayload){
