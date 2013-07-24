@@ -220,6 +220,9 @@ public class SerialInterface {
     	private boolean isReceiving = false;
     	private boolean isWaitingResponse = false;
     	private byte [] readBuffer = new byte[400];
+    	
+    	private static final int RESPONSE_TIMEOUT = 1500;
+    	private int responseCounter = 0;
 
         public SerialInterfaceThread(SerialInterface serialInterface) {
         	this.serialInterface = serialInterface;
@@ -357,10 +360,12 @@ public class SerialInterface {
     					this.isWaitingResponse = false;
     				} else if (nextByte == CAN) {
     					logger.debug("Rx CAN");  
+    					logger.error("Message cancelled by controller for node {}", this.serialInterface.isWaitingResponseFromNode);
     					CANCount++;
     					this.isWaitingResponse = false;
     				} else if (nextByte == NAK) {
     					logger.debug("Rx NAK");
+    					logger.error("Message not acklowledged by controller for node {}", this.serialInterface.isWaitingResponseFromNode);
     					NAKCount++;
     					this.isWaitingResponse = false;
     				} else {
@@ -370,6 +375,13 @@ public class SerialInterface {
     				}
         			this.isReceiving = false;
     			} else {
+    				if (this.isWaitingResponse && this.responseCounter >= this.RESPONSE_TIMEOUT) {
+    					this.isWaitingResponse = false;
+    					logger.error("Message timed out waiting for node {} to acknowledge", this.serialInterface.isWaitingResponseFromNode);
+    					// TODO: add retry of message
+    					// TODO: add dead node setting
+    				}
+    					
     				// Nothing to read so do the sending
     				if (!this.serialInterface.outputQueue.isEmpty() && !this.isWaitingResponse) {
     					logger.debug("Sending next message from output queue");
@@ -379,8 +391,8 @@ public class SerialInterface {
     						logger.debug("Message = " + SerialInterface.bb2hex(buffer));
 							this.serialInterface.outputStream.write(buffer);
 							this.isWaitingResponse = true;
+							this.responseCounter = 0;
 							this.serialInterface.isWaitingResponseFromNode = nextMessage.getMessageNode();
-														// TODO: isWaitingResponse should be set to true; set to false in processing of message if ACK was rx.
 						} catch (IOException e) {
 							logger.error("Got IOException while running serial interface thread: {}", e.getLocalizedMessage());
 						}
@@ -388,6 +400,8 @@ public class SerialInterface {
     			}
     			try {
 					Thread.sleep(50);
+					if (this.isWaitingResponse)
+						responseCounter += 50;
 				} catch (InterruptedException e) {
 				}
     		}
