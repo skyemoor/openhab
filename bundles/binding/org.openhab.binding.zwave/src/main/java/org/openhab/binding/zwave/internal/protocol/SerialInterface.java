@@ -34,6 +34,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
@@ -74,27 +76,49 @@ public class SerialInterface {
 	private static final byte ACK = 0x06;
 	private static final byte NAK = 0x15;
 	private static final byte CAN = 0x18; 
+	
+	private static final long WATCHDOG_TIMER_PERIOD = 10000; // 10 seconds watchdog timer
 
 	private static final Logger logger = LoggerFactory.getLogger(SerialInterface.class);
 	private SerialPort serialPort;
 	private int maxBufferSize = 1024;
 	private ArrayBlockingQueue<SerialMessage> outputQueue = new ArrayBlockingQueue<SerialMessage>(maxBufferSize, true);;
-    
-    private SerialInterfaceThread serialInterfaceThread;
-    private ArrayList<SerialInterfaceEventListener> eventListeners = new ArrayList<SerialInterfaceEventListener>();
-    
-    private InputStream inputStream;
-    private OutputStream outputStream;
-    
-    public int isWaitingResponseFromNode = 255;
+	
+	private SerialInterfaceThread serialInterfaceThread;
+	private ArrayList<SerialInterfaceEventListener> eventListeners = new ArrayList<SerialInterfaceEventListener>();
+	
+	private InputStream inputStream;
+	private OutputStream outputStream;
+	
+	public int isWaitingResponseFromNode = 255;
+	private Timer watchdog;
 
     /**
      * Constructor. Creates a new instance of the SerialInterface class.
      * @param serialPortName
      * @throws SerialInterfaceException
      */
-    public SerialInterface(String serialPortName) throws SerialInterfaceException {
+    public SerialInterface(final String serialPortName) throws SerialInterfaceException {
 		this.connect(serialPortName);
+		this.watchdog = new Timer(true);
+		this.watchdog.schedule(new TimerTask() {
+			@Override
+			public void run() {
+				logger.debug("Watchdog: Checking SerialInterfaceThread");
+				if (serialInterfaceThread != null && !serialInterfaceThread.isAlive())
+				{
+					logger.warn("SerialInterfaceThread not alive, respawning");
+					disconnect();
+					try {
+						connect(serialPortName);
+					} catch (SerialInterfaceException e) {
+						logger.error("unable to restart SerialInterfacethread: {}", e.getLocalizedMessage());
+					}
+				}
+			}
+			
+		}, WATCHDOG_TIMER_PERIOD, WATCHDOG_TIMER_PERIOD);
+
 	}
     
     /**
@@ -335,12 +359,10 @@ public class SerialInterface {
     					logger.debug("Rx CAN");  
     					CANCount++;
     					// Send CAN Back
-    					
     				} else if (nextByte == NAK) {
     					logger.debug("Rx NAK");
     					NAKCount++;
     					// Send NAK Back
-    					
     				} else {
     					logger.warn(String.format("Out of Frame flow. Got 0x%02X. Sending NAK.", nextByte));
     					OOFCount++; 
