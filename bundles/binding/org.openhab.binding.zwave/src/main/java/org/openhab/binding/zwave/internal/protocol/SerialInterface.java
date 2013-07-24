@@ -358,11 +358,11 @@ public class SerialInterface {
     				} else if (nextByte == CAN) {
     					logger.debug("Rx CAN");  
     					CANCount++;
-    					// Send CAN Back
+    					this.isWaitingResponse = false;
     				} else if (nextByte == NAK) {
     					logger.debug("Rx NAK");
     					NAKCount++;
-    					// Send NAK Back
+    					this.isWaitingResponse = false;
     				} else {
     					logger.warn(String.format("Out of Frame flow. Got 0x%02X. Sending NAK.", nextByte));
     					OOFCount++; 
