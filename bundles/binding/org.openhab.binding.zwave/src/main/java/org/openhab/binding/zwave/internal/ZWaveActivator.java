@@ -35,7 +35,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Extension of the default OSGi bundle activator
+ * Extension of the default OSGi bundle activator.
  * 
  * @author Victor Belov
  * @since 1.2.0

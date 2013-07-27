@@ -28,29 +28,17 @@
  */
 package org.openhab.binding.zwave.internal;
 
-
-import java.util.Map;
-
-import org.apache.commons.lang.StringUtils;
+import org.openhab.binding.zwave.ZWaveBindingAction;
 import org.openhab.binding.zwave.ZWaveBindingConfig;
 import org.openhab.binding.zwave.ZWaveBindingProvider;
-import org.openhab.binding.zwave.ZWaveCommandClass;
-import org.openhab.binding.zwave.ZWaveReportCommands;
-import org.openhab.binding.zwave.internal.protocol.ZWaveNode;
-import org.openhab.core.binding.BindingConfig;
 import org.openhab.core.items.Item;
-import org.openhab.core.library.items.DimmerItem;
-import org.openhab.core.library.items.StringItem;
-import org.openhab.core.library.items.SwitchItem;
 import org.openhab.model.item.binding.AbstractGenericBindingProvider;
 import org.openhab.model.item.binding.BindingConfigParseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 /**
  * This class is responsible for parsing the binding configuration.
- * 
  * @author Victor Belov
  * @author Brian Crosby
  * @since 1.3.0
@@ -76,6 +64,7 @@ public class ZWaveGenericBindingProvider extends AbstractGenericBindingProvider 
 	}
 
 	/**
+	 * Processes Z-Wave binding configuration string.
 	 * {@inheritDoc}
 	 */
 	@Override
@@ -83,10 +72,15 @@ public class ZWaveGenericBindingProvider extends AbstractGenericBindingProvider 
 		logger.debug("processBindingConfiguration({}, {})", item.getName(), bindingConfig);
 		super.processBindingConfiguration(context, item, bindingConfig);
 		String[] segments = bindingConfig.split(":");
+		
+		if (segments.length < 1 || segments.length > 3)
+			throw new BindingConfigParseException(String.format("invalid number of segments in binding: {}", bindingConfig));
 
-		String nodeId = segments[0];
-		if (StringUtils.isBlank(nodeId)) {
-			throw new BindingConfigParseException("node id must not be blank");
+		int nodeId;
+		try{
+			nodeId = Integer.parseInt(segments[0]);
+		} catch (Exception e){
+			throw new BindingConfigParseException(segments[1] + " is not a valid endpoint number");
 		}
 
 		int endpoint = 1;
@@ -98,42 +92,25 @@ public class ZWaveGenericBindingProvider extends AbstractGenericBindingProvider 
 			}
 		}
 
+		ZWaveBindingAction action = ZWaveBindingAction.NONE; // default
 		
-		//ZWaveCommandClass commandClass = ZWaveCommandClass.SWITCH; // default setting
-		ZWaveReportCommands rCommand = ZWaveReportCommands.NONE; // default
-		
-		/*if (item instanceof DimmerItem) {
-			commandClass = ZWaveCommandClass.DIMMER;
-		} else if (item instanceof SwitchItem) {
-			commandClass = ZWaveCommandClass.SWITCH;
-		} else if (item instanceof StringItem) {
-			commandClass = ZWaveCommandClass.INFORM;
-		}
-		
-		if(segments.length > 1) {
+		if(segments.length > 2) {
 			try {
-				commandClass = ZWaveCommandClass.valueOf(segments[1].toUpperCase());
+				action = ZWaveBindingAction.getZWaveBindingAction(segments[2].toUpperCase());
 			} catch(Exception e) {
-				throw new BindingConfigParseException(segments[1] + " is an unknown Z-Wave command class");
-			}
-		}
-		*/
-		
-		if(segments.length > 2){
-			try{
-				// TODO: need to valudate a reporting type to item type configuration
-					
-				rCommand = ZWaveReportCommands.valueOf(segments[2].toUpperCase());
-			} catch (Exception e){
-				throw new BindingConfigParseException(segments[2] + " is an unknown Z-Wave report command");
+				throw new BindingConfigParseException(segments[2] + " is an unknown Z-Wave binding action");
 			}
 		}
 		
-		ZWaveBindingConfig config = new ZWaveBindingConfig(nodeId, endpoint, rCommand);
+		ZWaveBindingConfig config = new ZWaveBindingConfig(nodeId, endpoint, action);
 		addBindingConfig(item, config);
 	}
 
-	public ZWaveBindingConfig getZwaveData(String itemName) {
+	/**
+	 * Returns the binding configuration for a string.
+	 * @return the binding configuration.
+	 */
+	public ZWaveBindingConfig getZwaveBindingConfig(String itemName) {
 		return (ZWaveBindingConfig) this.bindingConfigs.get(itemName);
 	}
 	

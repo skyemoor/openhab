@@ -31,9 +31,17 @@ package org.openhab.binding.zwave;
 import org.openhab.core.binding.BindingProvider;
 
 /**
+ * Binding provider interface. Defines the methods
+ * to interact with the binding provider.
  * @author Victor Belov
  * @since 1.2.0
  */
 public interface ZWaveBindingProvider extends BindingProvider {
-	public ZWaveBindingConfig getZwaveData(String itemName);
+	/**
+	 * Returns the binding configuration for the item with
+	 * this name.
+	 * @param itemName the name to get the binding configuration for.
+	 * @return the binding configuration.
+	 */
+	public ZWaveBindingConfig getZwaveBindingConfig(String itemName);
 }
