@@ -51,7 +51,7 @@ import gnu.io.SerialPort;
 import gnu.io.UnsupportedCommOperationException;
 
 /**
- * This class implements communications with a standard USB Z-Wave stick over serial protocol
+ * This class implements communications with a standard USB Z-Wave stick over serial protocol.
  * 
  * @author Victor Belov
  * @author Brian Crosby
@@ -59,39 +59,35 @@ import gnu.io.UnsupportedCommOperationException;
  */
 public class SerialInterface {
 
-	private static final byte[] zwave_nak = new byte[] { 0x15 };
-	private static final byte[] zwave_ack = new byte[] { 0x06 };
-	private static final byte[] zwave_can = new byte[] { 0x18 };
+	private static final int MAX_BUFFFER_SIZE = 1024;
+	private static final byte SOF = 0x01;
+	private static final byte ACK = 0x06;
+	private static final byte NAK = 0x15;
+	private static final byte CAN = 0x18; 
+	private static final long WATCHDOG_TIMER_PERIOD = 10000; // 10 seconds watchdog timer
+
+	private static final Logger logger = LoggerFactory.getLogger(SerialInterface.class);
 
 	private static int SOFCount = 0;
 	private static int CANCount = 0;
 	private static int NAKCount = 0;
 	private static int ACKCount = 0;
 	private static int OOFCount = 0;
-	
-	public static final byte MessageTypeRequest = 0x00;
-	public static final byte MessageTypeResponse = 0x01;
-	
-	private static final byte SOF = 0x01;
-	private static final byte ACK = 0x06;
-	private static final byte NAK = 0x15;
-	private static final byte CAN = 0x18; 
-	
-	private static final long WATCHDOG_TIMER_PERIOD = 10000; // 10 seconds watchdog timer
 
-	private static final Logger logger = LoggerFactory.getLogger(SerialInterface.class);
+	private final ArrayBlockingQueue<SerialMessage> outputQueue = new ArrayBlockingQueue<SerialMessage>(MAX_BUFFFER_SIZE, true);;
+	private final ArrayList<SerialInterfaceEventListener> eventListeners = new ArrayList<SerialInterfaceEventListener>();
+
 	private SerialPort serialPort;
-	private int maxBufferSize = 1024;
-	private ArrayBlockingQueue<SerialMessage> outputQueue = new ArrayBlockingQueue<SerialMessage>(maxBufferSize, true);;
-	
 	private SerialInterfaceThread serialInterfaceThread;
-	private ArrayList<SerialInterfaceEventListener> eventListeners = new ArrayList<SerialInterfaceEventListener>();
-	
 	private InputStream inputStream;
 	private OutputStream outputStream;
-	
-	public int isWaitingResponseFromNode = 255;
 	private Timer watchdog;
+
+	public static final byte MessageTypeRequest = 0x00;
+	public static final byte MessageTypeResponse = 0x01;
+
+	public int isWaitingResponseFromNode = 255;
+
 
     /**
      * Constructor. Creates a new instance of the SerialInterface class.
