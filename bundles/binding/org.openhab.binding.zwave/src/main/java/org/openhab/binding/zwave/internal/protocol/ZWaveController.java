@@ -1,5 +1,4 @@
 /**
- * openHAB, the open Home Automation Bus.
  * Copyright (C) 2010-2012, openHAB.org <admin@openhab.org>
  *
  * See the contributors.txt file in the distribution for a
@@ -35,8 +34,10 @@ import java.util.Calendar;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang.ArrayUtils;
+import org.openhab.binding.zwave.internal.commandclass.ZWaveBasicCommandClass;
 import org.openhab.binding.zwave.internal.commandclass.ZWaveCommandClass;
 import org.openhab.binding.zwave.internal.commandclass.ZWaveCommandClass.CommandClass;
 import org.openhab.binding.zwave.internal.commandclass.ZWaveManufacturerSpecificCommandClass;
@@ -146,21 +147,13 @@ public class ZWaveController implements SerialInterfaceEventListener {
 	private void setLastSentMessage(SerialMessage serialMessage) throws SerialInterfaceException
 	{
 		try {
-			functionWithoutNodeIdInReplySemaphore.acquire();
-			lastSentMessage = serialMessage;
-			return;
+			if(functionWithoutNodeIdInReplySemaphore.tryAcquire(ZWAVE_RESPONSE_TIMEOUT, TimeUnit.MILLISECONDS))
+			{
+				lastSentMessage = serialMessage;
+				return;
+			}
 		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
 		}
-//		try {
-//			if(functionWithoutNodeIdInReplySemaphore.tryAcquire(ZWAVE_RESPONSE_TIMEOUT, TimeUnit.MILLISECONDS))
-//			{
-//				lastSentMessage = serialMessage;
-//				return;
-//			}
-//		} catch (InterruptedException e) {
-//		}
 		throw new SerialInterfaceException(String.format("Sending message failed: {}", serialMessage.toString()));
 	}
 	
@@ -513,6 +506,20 @@ public class ZWaveController implements SerialInterfaceEventListener {
 		deviceClass.setGenericDeviceClass(generic);
 		deviceClass.setSpecificDeviceClass(specific);
 		
+		// Add mandatory command classes as specified by it's generic device class.
+		for (CommandClass commandClass : generic.getMandatoryCommandClasses()) {
+			ZWaveCommandClass zwaveCommandClass = ZWaveCommandClass.getInstance(commandClass.getKey(), this.zwaveNodes.get(nodeId), this);
+			if (zwaveCommandClass != null)
+				this.zwaveNodes.get(nodeId).addCommandClass(zwaveCommandClass);
+		}
+
+		// Add mandatory command classes as specified by it's specific device class.
+		for (CommandClass commandClass : specific.getMandatoryCommandClasses()) {
+			ZWaveCommandClass zwaveCommandClass = ZWaveCommandClass.getInstance(commandClass.getKey(), this.zwaveNodes.get(nodeId), this);
+			if (zwaveCommandClass != null)
+				this.zwaveNodes.get(nodeId).addCommandClass(zwaveCommandClass);
+		}
+
 		if(nodeId != this.ownNodeId)
 		{
 			this.requestNodeInfo(nodeId);
@@ -590,7 +597,7 @@ public class ZWaveController implements SerialInterfaceEventListener {
 	 * Notify our own event listeners of a Z-Wave event.
 	 * @param event the event to send.
 	 */
-	private void notifyEventListeners(ZWaveEvent event) {
+	public void notifyEventListeners(ZWaveEvent event) {
 		logger.debug("Notifying event listeners");
 		for (ZWaveEventListener listener : this.zwaveEventListeners) {
 			logger.debug("Notifying {}", listener.toString());
@@ -679,21 +686,24 @@ public class ZWaveController implements SerialInterfaceEventListener {
 	}
 	
 	/**
-	 * Request level from switch / dimmer. 
-	 * TODO: fix this using command classes.
-	 * @param nodeId
-	 * @param endpoint
+	 * Request level from the node / endpoint; 
+	 * @param nodeId the node id to request the level for.
+	 * @param endpoint the endpoint to request the level for.
 	 */
 	public void requestLevel(int nodeId, int endpoint) {
-    	SerialMessage newMessage = new SerialMessage(SerialMessageClass.SendData, SerialMessageType.Request);
-    	// NodeId, 3 is command length, 0x20 is COMMAND_CLASS_BASIC, 2 is BASIC_GET, level, 5 is TRANSMIT_OPTION_ACK+TRANSMIT_OPTION_AUTO_ROUTE
-    	byte[] newPayload = { (byte) nodeId, 3, 0x20, 2, 37 , 0};
-    	newMessage.setMessagePayload(newPayload);
-    	
-    	if (endpoint != 1)
-    		this.encapsulate(endpoint, newMessage);
-    	
-    	this.serialInterface.sendMessage(newMessage);		
+		ZWaveNode node = this.getNode(nodeId);
+		SerialMessage serialMessage = null;
+		
+		if (node.getCommandClass(CommandClass.BASIC) != null) {
+			serialMessage = ((ZWaveBasicCommandClass)node.getCommandClass(CommandClass.BASIC)).getLevelMessage();
+		}
+		
+		if (serialMessage == null) {
+			logger.error("No Command Class found on node {}, endpoint {} to request level.", nodeId, endpoint);
+			return;
+		}
+		
+		this.sendData(serialMessage);
 	}
 	
 	/**
@@ -728,21 +738,25 @@ public class ZWaveController implements SerialInterfaceEventListener {
 	}
 	
 	/**
-	 * Send level from switch / dimmer. 
-	 * TODO: fix this using command classes.
-	 * @param nodeId
-	 * @param endpoint
+	 * Send level to node. 
+	 * @param nodeId the node Id to send the level to.
+	 * @param endpoint the endpoint to send the level to.
 	 */
 	public void sendLevel(int nodeId, int endpoint, int level) {
-    	SerialMessage newMessage = new SerialMessage(SerialMessageClass.SendData, SerialMessageType.Request);
-    	// NodeId, 3 is command length, 0x20 is COMMAND_CLASS_BASIC, 1 is BASIC_SET, level, 5 is TRANSMIT_OPTION_ACK+TRANSMIT_OPTION_AUTO_ROUTE
-    	byte[] newPayload = { (byte) nodeId, 3, 0x20, 1, (byte)level, 5 , 0};
-    	newMessage.setMessagePayload(newPayload);
-    	
-    	if (endpoint != 1)
-    		this.encapsulate(endpoint, newMessage);
-    	
-    	this.serialInterface.sendMessage(newMessage);		
+		ZWaveNode node = this.getNode(nodeId);
+		SerialMessage serialMessage = null;
+		
+		if (node.getCommandClass(CommandClass.BASIC) != null) {
+			serialMessage = ((ZWaveBasicCommandClass)node.getCommandClass(CommandClass.BASIC)).setLevelMessage(level);
+		}
+		
+		if (serialMessage == null) {
+			logger.error("No Command Class found on node {}, endpoint {} to send level.", nodeId, endpoint);
+			return;
+		}
+		
+		this.sendData(serialMessage);
+
 	}
 
 	
@@ -839,8 +853,6 @@ public class ZWaveController implements SerialInterfaceEventListener {
 	public boolean isConnected() {
 		return isConnected;
 	}
-	
-	
 
 	/**
 	 * Update state enumeration. Indicates the type of application update state that was sent.

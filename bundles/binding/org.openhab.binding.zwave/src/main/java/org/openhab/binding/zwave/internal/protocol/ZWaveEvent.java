@@ -94,6 +94,7 @@ public class ZWaveEvent {
 	 * @since 1.3.0
 	 */
 	public enum ZWaveEventType	{
+		BASIC_EVENT,
 		SWITCH_EVENT,
 		DIMMER_EVENT,
 		NETWORK_EVENT

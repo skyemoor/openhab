@@ -129,8 +129,8 @@ public abstract class ZWaveCommandClass {
 	 * @since 1.3.0
 	 */
 	public enum CommandClass {
-		NO_OPERATION(0x00,"NO_OPERATION",null),
-		BASIC(0x20,"BASIC",null),
+		NO_OPERATION(0x00,"NO_OPERATION", ZWaveNoOperationCommandClass.class),
+		BASIC(0x20,"BASIC",ZWaveBasicCommandClass.class),
 		CONTROLLER_REPLICATION(0x21,"CONTROLLER_REPLICATION",null),
 		APPLICATION_STATUS(0x22,"APPLICATION_STATUS",null),
 		ZIP_SERVICES(0x23,"ZIP_SERVICES",null),

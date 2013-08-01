@@ -31,6 +31,7 @@ package org.openhab.binding.zwave.internal.protocol;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.openhab.binding.zwave.internal.commandclass.ZWaveCommandClass.CommandClass;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -270,6 +271,28 @@ public class ZWaveDeviceClass {
 		public String getLabel() {
 			return label;
 		}
+		
+		/**
+		 * Get the mandatory command classes for this device class.
+		 * @return the mandatory command classes.
+		 */
+		public CommandClass[] getMandatoryCommandClasses() {
+			switch (this) {
+				case NOT_KNOWN:
+					return new CommandClass[0];
+				case REMOTE_CONTROLLER:
+				case STATIC_CONTOLLER:
+				case REPEATER_SLAVE:
+					return new CommandClass[] { CommandClass.BASIC };
+				case BINARY_SWITCH:
+					return new CommandClass[] { CommandClass.BASIC, CommandClass.SWITCH_BINARY };
+				case MULTILEVEL_SWITCH:
+					return new CommandClass[] { CommandClass.BASIC, CommandClass.SWITCH_MULTILEVEL };
+					
+			default:
+				return new CommandClass[0];
+			}
+		}
 	}
 	
 	/**
@@ -289,7 +312,7 @@ public class ZWaveDeviceClass {
 		PORTABLE_SCENE_CONTROLLER(2, Generic.REMOTE_CONTROLLER, "Portable Scene Controller"),
 		PC_CONTROLLER(1, Generic.STATIC_CONTOLLER, "PC Controller"),
 		SCENE_CONTROLLER(2, Generic.STATIC_CONTOLLER, "Scene Controller"),
-		REPEATER_SLAVE(1, Generic.REPEATER_SLAVE, "Basic Repeater Slave"),
+		BASIC_REPEATER_SLAVE(1, Generic.REPEATER_SLAVE, "Basic Repeater Slave"),
 		POWER_SWITCH_BINARY(1, Generic.BINARY_SWITCH, "Binary Power Switch"),
 		SCENE_SWITCH_BINARY(2, Generic.BINARY_SWITCH, "Binary Scene Switch"),
 		POWER_SWITCH_MULTILEVEL(1, Generic.MULTILEVEL_SWITCH, "Multilevel Power Switch"),
@@ -371,6 +394,32 @@ public class ZWaveDeviceClass {
 		 */
 		public String getLabel() {
 			return label;
+		}
+		
+		/**
+		 * Get the mandatory command classes for this device class.
+		 * @return the mandatory command classes.
+		 */
+		public CommandClass[] getMandatoryCommandClasses() {
+			switch (this) {
+				case NOT_USED:
+				case PORTABLE_REMOTE_CONTROLLER:
+				case PC_CONTROLLER:
+				case BASIC_REPEATER_SLAVE:
+					return new CommandClass[0];
+				case PORTABLE_SCENE_CONTROLLER:
+				case SCENE_CONTROLLER:
+					return new CommandClass[] { CommandClass.ASSOCIATION, CommandClass.SCENE_CONTROLLER_CONF, CommandClass.MANUFACTURER_SPECIFIC };
+				case POWER_SWITCH_BINARY:
+				case POWER_SWITCH_MULTILEVEL:
+					return new CommandClass[] { CommandClass.SWITCH_ALL };
+				case SCENE_SWITCH_BINARY:
+				case SCENE_SWITCH_MULTILEVEL:
+					return new CommandClass[] { CommandClass.SCENE_ACTIVATION, CommandClass.SCENE_ACTUATOR_CONF, CommandClass.SWITCH_ALL, CommandClass.MANUFACTURER_SPECIFIC };
+					
+			default:
+				return new CommandClass[0];
+			}
 		}
 	}
 }
