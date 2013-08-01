@@ -40,6 +40,7 @@ import org.openhab.binding.zwave.internal.protocol.SerialInterface;
 import org.openhab.binding.zwave.internal.protocol.SerialInterfaceException;
 import org.openhab.binding.zwave.internal.protocol.ZWaveController;
 import org.openhab.binding.zwave.internal.protocol.ZWaveEvent;
+import org.openhab.binding.zwave.internal.protocol.ZWaveEvent.ZWaveEventType;
 import org.openhab.binding.zwave.internal.protocol.ZWaveEventListener;
 import org.openhab.binding.zwave.internal.protocol.ZWaveNode;
 import org.openhab.core.binding.AbstractActiveBinding;
@@ -82,7 +83,7 @@ public class ZWaveActiveBinding extends AbstractActiveBinding<ZWaveBindingProvid
 	private int refreshCount = 0;
 	
 	/**
-	 * @{inheritDoc}
+	 * {@inheritDoc}
 	 */
 	@Override
 	protected long getRefreshInterval() {
@@ -90,7 +91,7 @@ public class ZWaveActiveBinding extends AbstractActiveBinding<ZWaveBindingProvid
 	}
 
 	/**
-	 * @{inheritDoc}
+	 * {@inheritDoc}
 	 */
 	@Override
 	protected String getName() {
@@ -98,7 +99,7 @@ public class ZWaveActiveBinding extends AbstractActiveBinding<ZWaveBindingProvid
 	}
 
 	/**
-	 * @{inheritDoc}
+	 * {@inheritDoc}
 	 */
 	@Override
 	protected boolean isProperlyConfigured() {
@@ -139,7 +140,7 @@ public class ZWaveActiveBinding extends AbstractActiveBinding<ZWaveBindingProvid
 				int endpoint = provider.getZwaveBindingConfig(itemName).getEndpoint();
 				ZWaveBindingAction action = provider.getZwaveBindingConfig(itemName).getAction();
 				
-				ZWaveNode zNode = this.zController.getZwaveNodes().get(nodeId);
+				ZWaveNode zNode = this.zController.getNode(nodeId);
 				
 				//TODO: implement a better means then polling to get values.
 				//JWS: I don't think there is a better way, until we find out why some nodes just don't inform changes.
@@ -164,53 +165,53 @@ public class ZWaveActiveBinding extends AbstractActiveBinding<ZWaveBindingProvid
 						value = new StringType(String.format("0x%04x", zNode.getDeviceId()));
 						break;
 					case REPORT_BASIC:
-						value = new StringType(String.format("0x%02x", zNode.getBasicDeviceClass()));
+						value = new StringType(String.format("0x%02x", zNode.getDeviceClass().getBasicDeviceClass().getKey()));
 						break;
 					case REPORT_BASIC_LABEL:
-						value = new StringType(String.format("%s", zNode.zCC.getBasicCommandClass().getLabel()));
+						value = new StringType(String.format("%s", zNode.getDeviceClass().getBasicDeviceClass().getLabel()));
 						break;
 					case REPORT_GENERIC:
-						value = new StringType(String.format("0x%02x", zNode.getGenericDeviceClass()));
+						value = new StringType(String.format("0x%02x", zNode.getDeviceClass().getGenericDeviceClass().getKey()));
 						break;
 					case REPORT_GENERIC_LABEL:
-						value = new StringType(String.format("%s", zNode.zCC.getGenericCommandClass().getLabel()));
+						value = new StringType(String.format("%s", zNode.getDeviceClass().getGenericDeviceClass().getLabel()));
 						break;
 					case REPORT_SPECIFIC:
-						value = new StringType(String.format("0x%02x", zNode.getSpecificDeviceClass()));
+						value = new StringType(String.format("0x%02x", zNode.getDeviceClass().getSpecificDeviceClass().getKey()));
 						break;
 					case REPORT_SPECIFIC_LABEL:
-						value = new StringType(String.format("%s", zNode.zCC.getSpecificCommandClass().getLabel()));
+						value = new StringType(String.format("%s", zNode.getDeviceClass().getSpecificDeviceClass().getLabel()));
 						break;
 					case REPORT_VERSION:
 						value = new StringType(String.format("%s", zNode.getVersion()));
 						break;
 					case REPORT_ROUTING:
-						value = zNode.isRouting() == true ? OnOffType.ON : OnOffType.OFF;
+						value = new StringType(String.format("%s", (zNode.isRouting() == true) ? "True" : "False"));
 						break;
 					case REPORT_LISTENING:
-						value = zNode.isListening() == true ? OnOffType.ON : OnOffType.OFF;
+						value = new StringType(String.format("%s", (zNode.isListening() == true) ? "True" : "False"));
 						break;
 					case REPORT_SLEEPING_DEAD:
-						value = zNode.isSleepingOrDead() == true ? OnOffType.ON : OnOffType.OFF;
+						value = new StringType(String.format("%s", (zNode.isSleepingOrDead() == true) ? "True" : "False"));
 						break;
 					case REPORT_NAK:
-						value = new DecimalType(this.zController.getSerialInterfaceStats().get("NAK"));
+						value = new StringType(String.format("%d", this.serialInterface.getNAKCount()));
 						break;
 					case REPORT_SOF:
-						value = new DecimalType(this.zController.getSerialInterfaceStats().get("NAK"));
+						value = new StringType(String.format("%d", this.serialInterface.getSOFCount()));
 						break;
 					case REPORT_CAN:
-						value = new DecimalType(this.zController.getSerialInterfaceStats().get("NAK"));
+						value = new StringType(String.format("%d", this.serialInterface.getCANCount()));
 						break;
 					case REPORT_ACK:
-						value = new DecimalType(this.zController.getSerialInterfaceStats().get("NAK"));
+						value = new StringType(String.format("%d", this.serialInterface.getACKCount()));
 						break;
 					case REPORT_OOF:
-						value = new DecimalType(this.zController.getSerialInterfaceStats().get("NAK"));
+						value = new StringType(String.format("%d", this.serialInterface.getOOFCount()));
 						break;
 					case REPORT_LASTUPDATE:
 						SimpleDateFormat sdf = new SimpleDateFormat("MMM d yyyy HH:mm:ss");
-						value = new DateTimeType(String.format("%s", sdf.format(zNode.getLastUpdated()).toString()));
+						value = new StringType(sdf.format(zNode.getLastUpdated()).toString());
 						break;
 					case ZWAVE_JOIN:
 						continue; // no refresh on join action item, next item
@@ -318,7 +319,7 @@ public class ZWaveActiveBinding extends AbstractActiveBinding<ZWaveBindingProvid
 	}
 
 	/**
-	 * @{inheritDoc}
+	 * {@inheritDoc}
 	 */
 	@Override
 	public void updated(Dictionary<String, ?> config) throws ConfigurationException {
@@ -387,7 +388,7 @@ public class ZWaveActiveBinding extends AbstractActiveBinding<ZWaveBindingProvid
 			return;
 		
 		if (!isZwaveNetworkReady) {
-			if (event.getEventType() == ZWaveEvent.NETWORK_EVENT && event.getEventValue().equalsIgnoreCase("INIT_DONE")) {
+			if (event.getEventType() == ZWaveEventType.NETWORK_EVENT && ((String)event.getEventValue()).equalsIgnoreCase("INIT_DONE")) {
 				logger.debug("ZWaveIncomingEvent Called, Network Event, Init Done. Setting ZWave Network Ready.");
 				isZwaveNetworkReady = true;
 			} else {
@@ -399,8 +400,8 @@ public class ZWaveActiveBinding extends AbstractActiveBinding<ZWaveBindingProvid
 		
 		logger.debug("ZwaveIncomingEvent");
 		switch (event.getEventType()) {
-			case ZWaveEvent.SWITCH_EVENT:
-			case ZWaveEvent.DIMMER_EVENT:
+			case SWITCH_EVENT:
+			case DIMMER_EVENT:
 				logger.debug("Got a " + event.getEventType() + " event from Z-Wave network for nodeId = {}, state = {}, endpoint = {}", new Object[] { event.getNodeId(), event.getEventValue(), event.getEndpoint() } );
 				for (ZWaveBindingProvider provider : providers) {
 					logger.debug("Trying to find Item through {} provider", provider.toString());
@@ -421,7 +422,7 @@ public class ZWaveActiveBinding extends AbstractActiveBinding<ZWaveBindingProvid
 							} else {
 								// dimmer value
 								logger.debug("Zwave Event Value not of type of ON or OFF.");
-								eventPublisher.postUpdate(itemName, new PercentType(event.getEventValue()));
+								eventPublisher.postUpdate(itemName, new PercentType((Integer)event.getEventValue()));
 							}
 						}
 					}

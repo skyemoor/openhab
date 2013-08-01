@@ -55,7 +55,7 @@ public class ZWaveGenericBindingProvider extends AbstractGenericBindingProvider 
 	}
 
 	/**
-	 * @{inheritDoc}
+	 * {@inheritDoc}
 	 */
 	@Override
 	public void validateItemType(Item item, String bindingConfig) throws BindingConfigParseException {
@@ -80,7 +80,7 @@ public class ZWaveGenericBindingProvider extends AbstractGenericBindingProvider 
 		try{
 			nodeId = Integer.parseInt(segments[0]);
 		} catch (Exception e){
-			throw new BindingConfigParseException(segments[1] + " is not a valid endpoint number");
+			throw new BindingConfigParseException(segments[1] + " is not a valid node id.");
 		}
 
 		int endpoint = 1;
@@ -88,7 +88,7 @@ public class ZWaveGenericBindingProvider extends AbstractGenericBindingProvider 
 			try{
 				endpoint = Integer.parseInt(segments[1]);
 			} catch (Exception e){
-				throw new BindingConfigParseException(segments[1] + " is not a valid endpoint number");
+				throw new BindingConfigParseException(segments[1] + " is not a valid endpoint number.");
 			}
 		}
 
@@ -98,7 +98,7 @@ public class ZWaveGenericBindingProvider extends AbstractGenericBindingProvider 
 			try {
 				action = ZWaveBindingAction.getZWaveBindingAction(segments[2].toUpperCase());
 			} catch(Exception e) {
-				throw new BindingConfigParseException(segments[2] + " is an unknown Z-Wave binding action");
+				throw new BindingConfigParseException(segments[2] + " is an unknown Z-Wave binding action.");
 			}
 		}
 		

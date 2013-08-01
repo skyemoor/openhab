@@ -1,5 +1,5 @@
 /**
- * openHAB, the open Home Automation Bus.
+   * openHAB, the open Home Automation Bus.
  * Copyright (C) 2010-2012, openHAB.org <admin@openhab.org>
  *
  * See the contributors.txt file in the distribution for a
@@ -26,7 +26,18 @@
  * (EPL), the licensors of this Program grant you additional permission
  * to convey the resulting work.
  */
-package org.openhab.binding.zwave;
+package org.openhab.binding.zwave.internal.commandclass;
+
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
+import java.util.HashMap;
+import java.util.Map;
+
+import org.openhab.binding.zwave.internal.protocol.SerialMessage;
+import org.openhab.binding.zwave.internal.protocol.ZWaveController;
+import org.openhab.binding.zwave.internal.protocol.ZWaveNode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Z-Wave Command Class. Z-Wave device functions are controlled 
@@ -35,57 +46,234 @@ package org.openhab.binding.zwave;
  * @author Brian Crosby
  * @since 1.3.0
  */
-public class ZWaveCommandClass {
+public abstract class ZWaveCommandClass {
+	
+	private final ZWaveNode node;
+	private final ZWaveController controller;
 	
 	private static final Logger logger = LoggerFactory.getLogger(ZWaveCommandClass.class);
+	
+	/**
+	 * Protected constructor. Initiates a new instance of a Command Class.
+	 * @param node the node this instance commands.
+	 * @param controller the controller to send messages to.
+	 */
+	protected ZWaveCommandClass(ZWaveNode node, ZWaveController controller)	{
+		this.node = node;
+		this.controller = controller;
+		logger.debug("Command class {} created", getCommandClass().getLabel());
+	}
+	
+	/**
+	 * Returns the node this command class belongs to.
+	 * @return node
+	 */
+	protected ZWaveNode getNode() {
+		return node;
+	}
+	
+	/**
+	 * Returns the controller to send messages to.
+	 * @return controller
+	 */
+	protected ZWaveController getController() {
+		return controller;
+	}
+	
+	/**
+	 * Returns the command class.
+	 * @return command class
+	 */
+	public abstract CommandClass getCommandClass();
+	
+	/**
+	 * Handles an incoming application command request.
+	 * @param serialMessage the incoming message to process.
+	 * @param offset the offset position from which to start message processing.
+	 */
+	public abstract void handleApplicationCommandRequest(SerialMessage serialMessage, int offset);
 
-	public enum Basic {
-		NOTKNOWN(0, "Not Known", "N/A"),
-		CONTROLLER(1, "Controller", "N/A"),
-		STATIC_CONTROLLER(2, "Static Controller", "N/A"),
-		SLAVE(3, "Slave", "N/A"),
-		ROUTING_SLAVE(4, "Routing Slave", "N/A");
-		
+	/**
+	 * Gets an instance of the right command class.
+	 * @param i the code to instantiate
+	 * @return the ZWaveCommandClass instance that was instantiated, null otherwise 
+	 */
+	public static ZWaveCommandClass getInstance(int i, ZWaveNode node, ZWaveController controller) {
+		logger.debug(String.format("Creating new instance of command class 0x%02X", i));
+		try {
+			CommandClass commandClass = CommandClass.getCommandClass(i);
+			Class<? extends ZWaveCommandClass> commandClassClass = commandClass.getCommandClassClass();
+			
+			if (commandClassClass == null) {
+				logger.warn("Unsupported command class {}", commandClass.getLabel());
+				return null;
+			}
+				
+			Constructor<? extends ZWaveCommandClass> constructor = commandClassClass.getConstructor(ZWaveNode.class, ZWaveController.class);
+			return constructor.newInstance(new Object[] {node, controller});
+		} catch (InstantiationException e) {
+		} catch (IllegalAccessException e) {
+		} catch (IllegalArgumentException e) {
+		} catch (InvocationTargetException e) {
+		} catch (NoSuchMethodException e) {
+		} catch (SecurityException e) {
+		}
+		logger.error("Error instantiating command class 0x%02x", i);
+		return null;
+	}
+	
+	/**
+	 * Command class enumeration. Lists all command classes available.
+	 * Unsupported command classes by the binding return null for the command class Class.
+	 * @author Jan-Willem Spuij
+	 * @since 1.3.0
+	 */
+	public enum CommandClass {
+		NO_OPERATION(0x00,"NO_OPERATION",null),
+		BASIC(0x20,"BASIC",null),
+		CONTROLLER_REPLICATION(0x21,"CONTROLLER_REPLICATION",null),
+		APPLICATION_STATUS(0x22,"APPLICATION_STATUS",null),
+		ZIP_SERVICES(0x23,"ZIP_SERVICES",null),
+		ZIP_SERVER(0x24,"ZIP_SERVER",null),
+		SWITCH_BINARY(0x25,"SWITCH_BINARY",null),
+		SWITCH_MULTILEVEL(0x26,"SWITCH_MULTILEVEL",null),
+		SWITCH_ALL(0x27,"SWITCH_ALL",null),
+		SWITCH_TOGGLE_BINARY(0x28,"SWITCH_TOGGLE_BINARY",null),
+		SWITCH_TOGGLE_MULTILEVEL(0x29,"SWITCH_TOGGLE_MULTILEVEL",null),
+		CHIMNEY_FAN(0x2A,"CHIMNEY_FAN",null),
+		SCENE_ACTIVATION(0x2B,"SCENE_ACTIVATION",null),
+		SCENE_ACTUATOR_CONF(0x2C,"SCENE_ACTUATOR_CONF",null),
+		SCENE_CONTROLLER_CONF(0x2D,"SCENE_CONTROLLER_CONF",null),
+		ZIP_CLIENT(0x2E,"ZIP_CLIENT",null),
+		ZIP_ADV_SERVICES(0x2F,"ZIP_ADV_SERVICES",null),
+		SENSOR_BINARY(0x30,"SENSOR_BINARY",null),
+		SENSOR_MULTILEVEL(0x31,"SENSOR_MULTILEVEL",null),
+		METER(0x32,"METER",null),
+		ZIP_ADV_SERVER(0x33,"ZIP_ADV_SERVER",null),
+		ZIP_ADV_CLIENT(0x34,"ZIP_ADV_CLIENT",null),
+		METER_PULSE(0x35,"METER_PULSE",null),
+		METER_TBL_CONFIG(0x3C,"METER_TBL_CONFIG",null),
+		METER_TBL_MONITOR(0x3D,"METER_TBL_MONITOR",null),
+		METER_TBL_PUSH(0x3E,"METER_TBL_PUSH",null),
+		THERMOSTAT_HEATING(0x38,"THERMOSTAT_HEATING",null),
+		THERMOSTAT_MODE(0x40,"THERMOSTAT_MODE",null),
+		THERMOSTAT_OPERATING_STATE(0x42,"THERMOSTAT_OPERATING_STATE",null),
+		THERMOSTAT_SETPOINT(0x43,"THERMOSTAT_SETPOINT",null),
+		THERMOSTAT_FAN_MODE(0x44,"THERMOSTAT_FAN_MODE",null),
+		THERMOSTAT_FAN_STATE(0x45,"THERMOSTAT_FAN_STATE",null),
+		CLIMATE_CONTROL_SCHEDULE(0x46,"CLIMATE_CONTROL_SCHEDULE",null),
+		THERMOSTAT_SETBACK(0x47,"THERMOSTAT_SETBACK",null),
+		DOOR_LOCK_LOGGING(0x4C,"DOOR_LOCK_LOGGING",null),
+		SCHEDULE_ENTRY_LOCK(0x4E,"SCHEDULE_ENTRY_LOCK",null),
+		BASIC_WINDOW_COVERING(0x50,"BASIC_WINDOW_COVERING",null),
+		MTP_WINDOW_COVERING(0x51,"MTP_WINDOW_COVERING",null),
+		MULTI_INSTANCE(0x60,"MULTI_INSTANCE",null),
+		DOOR_LOCK(0x62,"DOOR_LOCK",null),
+		USER_CODE(0x63,"USER_CODE",null),
+		CONFIGURATION(0x70,"CONFIGURATION",null),
+		ALARM(0x71,"ALARM",null),
+		MANUFACTURER_SPECIFIC(0x72,"MANUFACTURER_SPECIFIC",ZWaveManufacturerSpecificCommandClass.class),
+		POWERLEVEL(0x73,"POWERLEVEL",null),
+		PROTECTION(0x75,"PROTECTION",null),
+		LOCK(0x76,"LOCK",null),
+		NODE_NAMING(0x77,"NODE_NAMING",null),
+		FIRMWARE_UPDATE_MD(0x7A,"FIRMWARE_UPDATE_MD",null),
+		GROUPING_NAME(0x7B,"GROUPING_NAME",null),
+		REMOTE_ASSOCIATION_ACTIVATE(0x7C,"REMOTE_ASSOCIATION_ACTIVATE",null),
+		REMOTE_ASSOCIATION(0x7D,"REMOTE_ASSOCIATION",null),
+		BATTERY(0x80,"BATTERY",null),
+		CLOCK(0x81,"CLOCK",null),
+		HAIL(0x82,"HAIL",null),
+		WAKE_UP(0x84,"WAKE_UP",null),
+		ASSOCIATION(0x85,"ASSOCIATION",null),
+		VERSION(0x86,"VERSION",null),
+		INDICATOR(0x87,"INDICATOR",null),
+		PROPRIETARY(0x88,"PROPRIETARY",null),
+		LANGUAGE(0x89,"LANGUAGE",null),
+		TIME(0x8A,"TIME",null),
+		TIME_PARAMETERS(0x8B,"TIME_PARAMETERS",null),
+		GEOGRAPHIC_LOCATION(0x8C,"GEOGRAPHIC_LOCATION",null),
+		COMPOSITE(0x8D,"COMPOSITE",null),
+		MULTI_INSTANCE_ASSOCIATION(0x8E,"MULTI_INSTANCE_ASSOCIATION",null),
+		MULTI_CMD(0x8F,"MULTI_CMD",null),
+		ENERGY_PRODUCTION(0x90,"ENERGY_PRODUCTION",null),
+		MANUFACTURER_PROPRIETARY(0x91,"MANUFACTURER_PROPRIETARY",null),
+		SCREEN_MD(0x92,"SCREEN_MD",null),
+		SCREEN_ATTRIBUTES(0x93,"SCREEN_ATTRIBUTES",null),
+		SIMPLE_AV_CONTROL(0x94,"SIMPLE_AV_CONTROL",null),
+		AV_CONTENT_DIRECTORY_MD(0x95,"AV_CONTENT_DIRECTORY_MD",null),
+		AV_RENDERER_STATUS(0x96,"AV_RENDERER_STATUS",null),
+		AV_CONTENT_SEARCH_MD(0x97,"AV_CONTENT_SEARCH_MD",null),
+		SECURITY(0x98,"SECURITY",null),
+		AV_TAGGING_MD(0x99,"AV_TAGGING_MD",null),
+		IP_CONFIGURATION(0x9A,"IP_CONFIGURATION",null),
+		ASSOCIATION_COMMAND_CONFIGURATION(0x9B,"ASSOCIATION_COMMAND_CONFIGURATION",null),
+		SENSOR_ALARM(0x9C,"SENSOR_ALARM",null),
+		SILENCE_ALARM(0x9D,"SILENCE_ALARM",null),
+		SENSOR_CONFIGURATION(0x9E,"SENSOR_CONFIGURATION",null),
+		MARK(0xEF,"MARK",null),
+		NON_INTEROPERABLE(0xF0,"NON_INTEROPERABLE",null);
+
 		/**
-	     * A mapping between the integer code and its corresponding Basic CC to facilitate lookup by code.
-	     */
-	    private static Map<Integer, Basic> codeToBasicMapping;
-		
+		 * A mapping between the integer code and its corresponding
+		 * Command class to facilitate lookup by code.
+		 */
+		private static Map<Integer, CommandClass> codeToCommandClassMapping;
+
 		private int key;
 		private String label;
-		private String desc;
-		
-		private Basic (int key, String label, String desc){
+		private Class<? extends ZWaveCommandClass> commandClassClass;
+
+
+		private CommandClass(int key, String label, Class<? extends ZWaveCommandClass> commandClassClass) {
 			this.key = key;
 			this.label = label;
-			this.desc = desc;
+			this.commandClassClass = commandClassClass;
 		}
 
-		 public static Basic getBasic(int i) {
-		        if (codeToBasicMapping == null) {
-		            initMapping();
-		        }
-		        Basic result = null;
-		        for (Basic s : values()) {
-		            result = codeToBasicMapping.get(i);
-		        }
-		        return result;
-		 }
-		 
-		    private static void initMapping() {
-		    	codeToBasicMapping = new HashMap<Integer, Basic>();
-		        for (Basic s : values()) {
-		        	codeToBasicMapping.put(s.key, s);
-		        }
-		    }
-		
+		private static void initMapping() {
+			codeToCommandClassMapping = new HashMap<Integer, CommandClass>();
+			for (CommandClass s : values()) {
+				codeToCommandClassMapping.put(s.key, s);
+			}
+		}
+
+		/**
+		 * Lookup function based on the command class code.
+		 * @param i the code to lookup
+		 * @return enumeration value of the command class.
+		 * @exception IllegalArgumentException thrown when there is no command class with code i
+		 */
+		public static CommandClass getCommandClass(int i) throws IllegalArgumentException {
+			if (codeToCommandClassMapping == null) {
+				initMapping();
+			}
+			
+			if (!codeToCommandClassMapping.containsKey(i))
+				throw new IllegalArgumentException(String.format("Command Class 0x%02x not found", i));
+			
+			return codeToCommandClassMapping.get(i);
+		}
+
+		/**
+		 * @return the key
+		 */
+		public int getKey() {
+			return key;
+		}
+
 		/**
 		 * @return the label
 		 */
 		public String getLabel() {
 			return label;
 		}
-				
+		
+		/**
+		 * @return the command class Class
+		 */
+		public Class<? extends ZWaveCommandClass> getCommandClassClass() {
+			return commandClassClass;
+		}
 	}
-	
 }

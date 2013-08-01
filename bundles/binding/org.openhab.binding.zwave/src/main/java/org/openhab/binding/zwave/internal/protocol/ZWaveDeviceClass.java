@@ -31,6 +31,9 @@ package org.openhab.binding.zwave.internal.protocol;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Z-Wave device class. A Z-Wave device class groups devices with the same
  * functionality together in a class.
@@ -39,6 +42,82 @@ import java.util.Map;
  */
 public class ZWaveDeviceClass {
 
+	private static final Logger logger = LoggerFactory.getLogger(ZWaveDeviceClass.class);
+
+	private Basic basicDeviceClass;
+	private Generic genericDeviceClass;
+	private Specific specificDeviceClass;
+	
+	/**
+	 * Constructor. Creates a new instance of the Z-Wave device class.
+	 * @param basicDeviceClass the basic device class of this node.
+	 * @param genericDeviceClass the generic device class of this node.
+	 * @param specificDeviceClass the specific device class of this node.
+	 */
+	public ZWaveDeviceClass(Basic basicDeviceClass, Generic genericDeviceClass, Specific specificDeviceClass){
+		logger.debug("Constructing Zwave Device Class");
+		
+		this.basicDeviceClass = basicDeviceClass;
+		this.genericDeviceClass = genericDeviceClass;
+		this.specificDeviceClass = specificDeviceClass;
+		
+	}
+
+	/**
+	 * Returns the basic device class of the node.
+	 * @return the basicDeviceClass
+	 */
+	public Basic getBasicDeviceClass() {
+		return basicDeviceClass;
+	}
+
+	/**
+	 * Set the basic device class of the node.
+	 * @param basicDeviceClass the basicDeviceClass to set
+	 */
+	public void setBasicDeviceClass(Basic basicDeviceClass) {
+		this.basicDeviceClass = basicDeviceClass;
+	}
+
+	/**
+	 * Get the generic device class of the node.
+	 * @return the genericDeviceClass
+	 */
+	public Generic getGenericDeviceClass() {
+		return genericDeviceClass;
+	}
+
+	/**
+	 * Set the generic device class of the node.
+	 * @param genericDeviceClass the genericDeviceClass to set
+	 */
+	public void setGenericDeviceClass(Generic genericDeviceClass) {
+		this.genericDeviceClass = genericDeviceClass;
+	}
+	
+	/**
+	 * Get the specific device class of the node.
+	 * @return the specificDeviceClass
+	 */
+	public Specific getSpecificDeviceClass() {
+		return specificDeviceClass;
+	}	
+	/**
+	 * Set the specific device class of the node.
+	 * @param specificDeviceClass the specificDeviceClass to set
+	 * @exception IllegalArgumentException thrown when the specific device class does not match
+	 * the generic device class.
+	 */
+	public void setSpecificDeviceClass(Specific specificDeviceClass) throws IllegalArgumentException {
+		
+		// The specific Device class does not match the generic device class.
+		if (specificDeviceClass.genericDeviceClass != Generic.NOT_KNOWN && 
+				specificDeviceClass.genericDeviceClass != this.genericDeviceClass)
+			throw new IllegalArgumentException("specificDeviceClass");
+		
+		this.specificDeviceClass = specificDeviceClass;
+	}
+	
 	/**
 	 * Z-Wave basic Device Class enumeration. The Basic Device Class provides
 	 * the device with a role in the Z-Wave network. 
@@ -78,12 +157,24 @@ public class ZWaveDeviceClass {
 		 * Lookup function based on the basic device class code.
 		 * @param i the code to lookup
 		 * @return enumeration value of the basic device class.
+		 * @exception IllegalArgumentException thrown when there is no basic device class with code i
 		 */
-		public static Basic getBasic(int i) {
+		public static Basic getBasic(int i) throws IllegalArgumentException {
 			if (codeToBasicMapping == null) {
 				initMapping();
 			}
+			
+			if (!codeToBasicMapping.containsKey(i))
+				throw new IllegalArgumentException(String.format("Basic device class 0x%02x not found", i));
+			
 			return codeToBasicMapping.get(i);
+		}
+
+		/**
+		 * @return the key
+		 */
+		public int getKey() {
+			return key;
 		}
 
 		/**
@@ -97,7 +188,7 @@ public class ZWaveDeviceClass {
 	/**
 	 * Z-Wave Generic Device Class enumeration. The Generic Device Class
 	 * describes functionality of a device in the Network. Generic Device Classes
-	 * can contain Command Classes that are mandatory or recommended for all devices
+	 * can have Command Classes that are mandatory or recommended for all devices
 	 * that belong to this device class. Generic device class do not relate directly
 	 * to Basic Device Classes. E.G. a BINARY_SWITCH can be a ROUTING_SLAVE or a SLAVE.
 	 * @author Brian Crosby
@@ -153,12 +244,24 @@ public class ZWaveDeviceClass {
 		 * Lookup function based on the generic device class code.
 		 * @param i the code to lookup
 		 * @return enumeration value of the generic device class.
+		 * @exception IllegalArgumentException thrown when there is no generic device class with code i
 		 */
-		public static Generic getGeneric(int i) {
+		public static Generic getGeneric(int i) throws IllegalArgumentException {
 			if (codeToGenericMapping == null) {
 				initMapping();
 			}
+			
+			if (!codeToGenericMapping.containsKey(i))
+				throw new IllegalArgumentException(String.format("Generic device class 0x%02x not found", i));
+			
 			return codeToGenericMapping.get(i);
+		}
+
+		/**
+		 * @return the key
+		 */
+		public int getKey() {
+			return key;
 		}
 
 		/**
@@ -237,8 +340,10 @@ public class ZWaveDeviceClass {
 	     * @param genericDeviceClass the generic device class
 	     * @param i the specific device class code
 	     * @return the Specific enumeration
+		 * @exception IllegalArgumentException thrown when there is no specific device class with code i for
+		 * that generic device class.
 	     */
-		public static Specific getSpecific(Generic genericDeviceClass, int i) {
+		public static Specific getSpecific(Generic genericDeviceClass, int i) throws IllegalArgumentException {
 	        if (codeToSpecificMapping == null) {
 	            initMapping();
 	        }
@@ -247,7 +352,18 @@ public class ZWaveDeviceClass {
 	        if (i == 0)
 	        	return codeToSpecificMapping.get(Generic.NOT_KNOWN).get(i);
 	        
+	        if (!codeToSpecificMapping.containsKey(genericDeviceClass) || !codeToSpecificMapping.get(genericDeviceClass).containsKey(i))
+				throw new IllegalArgumentException(String.format("Specific device class 0x%02x not found", i));
+			
+	        
 	        return codeToSpecificMapping.get(genericDeviceClass).get(i);
+		}
+
+		/**
+		 * @return the key
+		 */
+		public int getKey() {
+			return key;
 		}
 
 		/**
