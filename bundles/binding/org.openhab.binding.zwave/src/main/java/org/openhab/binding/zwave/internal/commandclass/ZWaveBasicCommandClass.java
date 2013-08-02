@@ -28,8 +28,6 @@
  */
 package org.openhab.binding.zwave.internal.commandclass;
 
-import java.util.Calendar;
-
 import org.openhab.binding.zwave.internal.protocol.SerialMessage;
 import org.openhab.binding.zwave.internal.protocol.SerialMessage.SerialMessageClass;
 import org.openhab.binding.zwave.internal.protocol.SerialMessage.SerialMessageType;
@@ -37,13 +35,12 @@ import org.openhab.binding.zwave.internal.protocol.ZWaveController;
 import org.openhab.binding.zwave.internal.protocol.ZWaveEvent;
 import org.openhab.binding.zwave.internal.protocol.ZWaveEvent.ZWaveEventType;
 import org.openhab.binding.zwave.internal.protocol.ZWaveNode;
-import org.openhab.core.types.EventType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Handles the Basic command class. All devices will if possible support 
- * the Basic commands. This class contains a small number of very basic
+ * Handles the Basic command class. Almost all devices support 
+ * the Basic commands. This class contains a few basic
  * commands that can be used to control the basic functionality of a device. 
  * The commands include the possibility to set a given level, get a given
  * level and report a level.
@@ -60,6 +57,8 @@ public class ZWaveBasicCommandClass extends ZWaveCommandClass {
 	
 	/**
 	 * Creates a new instance of the ZWaveBasicCommandClass class.
+	 * @param node the node this command class belongs to
+	 * @param controller the controller to use
 	 */
 	public ZWaveBasicCommandClass(ZWaveNode node,
 			ZWaveController controller) {
@@ -80,7 +79,6 @@ public class ZWaveBasicCommandClass extends ZWaveCommandClass {
 	@Override
 	public void handleApplicationCommandRequest(SerialMessage serialMessage,
 			int offset) {
-
 		logger.debug("Handle Message Basic Request");
 		logger.debug(String.format("Received Basic Request for Node ID = %d", this.getNode().getNodeId()));
 		int command = serialMessage.getMessagePayload()[offset] & 0xFF;

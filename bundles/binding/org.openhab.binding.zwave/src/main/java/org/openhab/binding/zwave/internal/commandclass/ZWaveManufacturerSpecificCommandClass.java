@@ -40,7 +40,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Handles the manufacturer specific command class. Class to request and report
- * manufacturer specific information. The Manufacturer ID is assigned by Zensys upon request.
+ * manufacturer specific information.
  * @author Jan-Willem Spuij
  * @since 1.3.0
  */

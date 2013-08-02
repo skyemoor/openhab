@@ -1,0 +1,137 @@
+/**
+ * openHAB, the open Home Automation Bus.
+ * Copyright (C) 2010-2012, openHAB.org <admin@openhab.org>
+ *
+ * See the contributors.txt file in the distribution for a
+ * full listing of individual contributors.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, see <http://www.gnu.org/licenses>.
+ *
+ * Additional permission under GNU GPL version 3 section 7
+ *
+ * If you modify this Program, or any covered work, by linking or
+ * combining it with Eclipse (or a modified version of that library),
+ * containing parts covered by the terms of the Eclipse Public License
+ * (EPL), the licensors of this Program grant you additional permission
+ * to convey the resulting work.
+ */
+package org.openhab.binding.zwave.internal.commandclass;
+
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
+
+import org.openhab.binding.zwave.internal.commandclass.ZWaveCommandClass.CommandClass;
+import org.openhab.binding.zwave.internal.protocol.SerialMessage;
+import org.openhab.binding.zwave.internal.protocol.ZWaveController;
+import org.openhab.binding.zwave.internal.protocol.ZWaveEvent;
+import org.openhab.binding.zwave.internal.protocol.ZWaveNode;
+import org.openhab.binding.zwave.internal.protocol.ZWaveEvent.ZWaveEventType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Handles the Version command class. The Version Command Class is 
+ * used to obtain the library type, the protocol version
+ * used by the node, the individual command class versions 
+ * used by the node and the vendor specific application 
+ * version from a device.
+ * @author Jan-Willem Spuij
+ * @since 1.3.0
+ */
+public class ZWaveVersionCommandClass extends ZWaveCommandClass {
+
+	private static final Logger logger = LoggerFactory.getLogger(ZWaveBasicCommandClass.class);
+
+	public static final int VERSION_GET = 0x11;
+	public static final int VERSION_REPORT = 0x12;
+	public static final int VERSION_COMMAND_CLASS_GET = 0x13;
+	public static final int VERSION_COMMAND_CLASS_REPORT = 0x14;
+	
+	/**
+	 * Creates a new instance of the ZWaveVersionCommandClass class.
+	 * @param node the node this command class belongs to
+	 * @param controller the controller to use
+	 */
+	public ZWaveVersionCommandClass(ZWaveNode node, ZWaveController controller) {
+		super(node, controller);
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
+	public CommandClass getCommandClass() {
+		return CommandClass.VERSION;
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
+	public void handleApplicationCommandRequest(SerialMessage serialMessage,
+			int offset) {
+		logger.debug("Handle Message Version Request");
+		logger.debug(String.format("Received Version Request for Node ID = %d", this.getNode().getNodeId()));
+		int command = serialMessage.getMessagePayload()[offset] & 0xFF;
+		switch (command) {
+			case VERSION_GET:
+			case VERSION_COMMAND_CLASS_GET:
+				logger.warn(String.format("Command 0x%02X not implemented.", command));
+				return;
+			case VERSION_REPORT:
+				logger.debug(String.format("Received Version Report Response for Node ID = %d", this.getNode().getNodeId()));
+				int libraryType = serialMessage.getMessagePayload()[offset + 1] & 0xFF;
+				int protocolVersion = serialMessage.getMessagePayload()[offset + 2] & 0xFF;
+				int protocolSubVersion = serialMessage.getMessagePayload()[offset + 3] & 0xFF;
+				int applicationVersion = serialMessage.getMessagePayload()[offset + 4] & 0xFF;
+				int applicationSubVersion = serialMessage.getMessagePayload()[offset + 5] & 0xFF;
+				
+				logger.debug(String.format("Node %d Library Type = 0x%02x", this.getNode().getNodeId(), libraryType));
+				logger.debug(String.format("Node %d Protocol Version = 0x%02x", this.getNode().getNodeId(), protocolVersion));
+				logger.debug(String.format("Node %d Protocol Sub Version = 0x%02x", this.getNode().getNodeId(), protocolSubVersion));
+				logger.debug(String.format("Node %d Application Version = 0x%02x", this.getNode().getNodeId(), applicationVersion));
+				logger.debug(String.format("Node %d Application Sub Version = 0x%02x", this.getNode().getNodeId(), applicationSubVersion));
+				
+				// Nothing to do with this info, not exactly useful.
+				break;
+			case VERSION_COMMAND_CLASS_REPORT:
+				logger.debug(String.format("Received Command Class Version Report Response for Node ID = %d", this.getNode().getNodeId()));
+				int commandClassCode = serialMessage.getMessagePayload()[offset + 1] & 0xFF;
+				int commandClassVersion = serialMessage.getMessagePayload()[offset + 2] & 0xFF;
+				
+				try {
+					CommandClass commandClass = CommandClass.getCommandClass(commandClassCode);
+
+					logger.debug(String.format("Node %d Requested Command Class = %s (0x%02x)", this.getNode().getNodeId(), commandClass.getLabel() , commandClassCode));
+					logger.debug(String.format("Node %d Version = %d", this.getNode().getNodeId(), commandClassVersion));
+
+					// The version is set on the command class for this node. By updating the version, extra functionality is unlocked in the command class.
+					// The messages are backwards compatible, so it's not a problem that there is a slight delay when the command class version is queried on the
+					// node.
+					ZWaveCommandClass zwaveCommandClass = this.getNode().getCommandClass(commandClass);
+					zwaveCommandClass.setVersion(commandClassVersion);
+					
+					logger.debug(String.format("Node %d Version = %d, version set. Enabling extra functionality.", this.getNode().getNodeId(), commandClassVersion));
+				} catch (IllegalArgumentException e) {
+					logger.error("Error setting version on command class 0x%02x", commandClassCode);
+				}
+				break;
+			default:
+			logger.warn(String.format("Unsupported Command 0x%02X for command class %s (0x%02X).", 
+					command, 
+					this.getCommandClass().getLabel(),
+					this.getCommandClass().getKey()));
+		}
+	}
+}

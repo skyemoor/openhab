@@ -47,11 +47,13 @@ import org.slf4j.LoggerFactory;
  * @since 1.3.0
  */
 public abstract class ZWaveCommandClass {
-	
+
+	private static final Logger logger = LoggerFactory.getLogger(ZWaveCommandClass.class);
+
 	private final ZWaveNode node;
 	private final ZWaveController controller;
 	
-	private static final Logger logger = LoggerFactory.getLogger(ZWaveCommandClass.class);
+	private int version = 1;
 	
 	/**
 	 * Protected constructor. Initiates a new instance of a Command Class.
@@ -78,6 +80,22 @@ public abstract class ZWaveCommandClass {
 	 */
 	protected ZWaveController getController() {
 		return controller;
+	}
+	
+	/**
+	 * Sets the version of the command class.
+	 * @param version
+	 */
+	protected void setVersion(int version) {
+		this.version = version;
+	}
+	
+	/**
+	 * Returns the version of the command class.
+	 * @return node
+	 */
+	public int getVersion() {
+		return version;
 	}
 	
 	/**
@@ -125,6 +143,7 @@ public abstract class ZWaveCommandClass {
 	/**
 	 * Command class enumeration. Lists all command classes available.
 	 * Unsupported command classes by the binding return null for the command class Class.
+	 * Taken from: http://wiki.micasaverde.com/index.php/ZWave_Command_Classes
 	 * @author Jan-Willem Spuij
 	 * @since 1.3.0
 	 */

@@ -283,14 +283,28 @@ public class ZWaveDeviceClass {
 				case REMOTE_CONTROLLER:
 				case STATIC_CONTOLLER:
 				case REPEATER_SLAVE:
+				case TOGGLE_SWITCH:
+				case REMOTE_SWITCH:
+				case WINDOW_COVERING:
+				case THERMOSTAT:
+				case AV_CONTROL_POINT:
 					return new CommandClass[] { CommandClass.BASIC };
 				case BINARY_SWITCH:
 					return new CommandClass[] { CommandClass.BASIC, CommandClass.SWITCH_BINARY };
 				case MULTILEVEL_SWITCH:
 					return new CommandClass[] { CommandClass.BASIC, CommandClass.SWITCH_MULTILEVEL };
-					
-			default:
-				return new CommandClass[0];
+				case BINARY_SENSOR:
+					return new CommandClass[] { CommandClass.BASIC, CommandClass.SENSOR_BINARY };
+				case MULTILEVEL_SENSOR:
+					return new CommandClass[] { CommandClass.BASIC, CommandClass.SENSOR_MULTILEVEL };
+				case PULSE_METER:
+					return new CommandClass[] { CommandClass.BASIC, CommandClass.METER_PULSE };
+				case ENTRY_CONTROL:
+					return new CommandClass[] { CommandClass.BASIC, CommandClass.LOCK };
+				case SEMI_INTEROPERABLE:
+					return new CommandClass[] { CommandClass.BASIC, CommandClass.MANUFACTURER_SPECIFIC, CommandClass.VERSION, CommandClass.PROPRIETARY };
+				default:
+					return new CommandClass[0];
 			}
 		}
 	}
@@ -406,6 +420,14 @@ public class ZWaveDeviceClass {
 				case PORTABLE_REMOTE_CONTROLLER:
 				case PC_CONTROLLER:
 				case BASIC_REPEATER_SLAVE:
+				case SWITCH_REMOTE_BINARY:
+				case SWITCH_REMOTE_MULTILEVEL: 
+				case SWITCH_REMOTE_TOGGLE_BINARY:
+				case SWITCH_REMOTE_TOGGLE_MULTILEVEL:
+				case ROUTING_SENSOR_BINARY: // In the documentation Binary Sensor command class is specified, but this is already on the generic class...
+				case ROUTING_SENSOR_MULTILEVEL: // In the documentation Multilevel Sensor command class is specified, but this is already on the generic class...
+				case DOOR_LOCK:
+				case THERMOSTAT_HEATING:
 					return new CommandClass[0];
 				case PORTABLE_SCENE_CONTROLLER:
 				case SCENE_CONTROLLER:
@@ -416,9 +438,25 @@ public class ZWaveDeviceClass {
 				case SCENE_SWITCH_BINARY:
 				case SCENE_SWITCH_MULTILEVEL:
 					return new CommandClass[] { CommandClass.SCENE_ACTIVATION, CommandClass.SCENE_ACTUATOR_CONF, CommandClass.SWITCH_ALL, CommandClass.MANUFACTURER_SPECIFIC };
-					
-			default:
-				return new CommandClass[0];
+				case MOTOR_MULTIPOSITION:
+					return new CommandClass[] { CommandClass.VERSION, CommandClass.MANUFACTURER_SPECIFIC };
+				case SWITCH_TOGGLE_BINARY: 
+					return new CommandClass[] { CommandClass.SWITCH_TOGGLE_BINARY };
+				case SWITCH_TOGGLE_MULTILEVEL: 
+					return new CommandClass[] { CommandClass.SWITCH_TOGGLE_MULTILEVEL };
+				case ENERGY_PRODUCTION:
+					return new CommandClass[] { CommandClass.ENERGY_PRODUCTION };
+				case SIMPLE_WINDOW_COVERING:
+					return new CommandClass[] { CommandClass.BASIC_WINDOW_COVERING };
+				case THERMOSTAT_GENERAL:
+					return new CommandClass[] { CommandClass.MANUFACTURER_SPECIFIC, CommandClass.THERMOSTAT_MODE, CommandClass.THERMOSTAT_SETPOINT };
+				case SETBACK_SCHEDULE_THERMOSTAT:
+					// TODO: Battery and Wake Up command classes are mandatory for battery operated setback schedule thermostats.
+					return new CommandClass[] { CommandClass.CLIMATE_CONTROL_SCHEDULE, CommandClass.MANUFACTURER_SPECIFIC, CommandClass.MULTI_CMD, CommandClass.VERSION };
+				case SATELLITE_RECEIVER:
+					return new CommandClass[] { CommandClass.SIMPLE_AV_CONTROL, CommandClass.MANUFACTURER_SPECIFIC, CommandClass.VERSION };
+				default:
+					return new CommandClass[0];
 			}
 		}
 	}
