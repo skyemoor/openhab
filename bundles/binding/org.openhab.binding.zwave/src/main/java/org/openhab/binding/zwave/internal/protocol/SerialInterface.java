@@ -410,29 +410,7 @@ public class SerialInterface {
     		
 			try {
 				while (!this.isInterrupted()) {
-					
-					if(isWaitingForResponse && (calendar.getTimeInMillis() > (lastSentTime + SERIAL_TIMEOUT))) {
-						isWaitingForResponse = false;
-    					logger.error("Message timed out waiting for controller to acknowledge, resending");
-					}
-					
-					if (!isWaitingForResponse) {
-						if (currentMessage == null && !this.serialInterface.sendQueue.isEmpty()) {
-							currentMessage = this.serialInterface.sendQueue.poll();
-	    					logger.debug("Getting next message from output queue");
-						}
-						
-						if (currentMessage != null) {
-    						byte[] buffer = currentMessage.getMessageBuffer();
-    						logger.debug("Sending Message = " + SerialInterface.bb2hex(buffer));
-							isWaitingForResponse = true;
-							this.serialInterface.outputStream.write(buffer);
-    						lastSentTime = calendar.getTimeInMillis();
-						}
-					}
-					
-					int availableBytes = this.serialInterface.inputStream.available();
-					if (availableBytes > 0)
+					while (this.serialInterface.inputStream.available() > 0)
 					{
 						int nextByte = this.serialInterface.inputStream.read();
 						switch (nextByte) {
@@ -477,6 +455,27 @@ public class SerialInterface {
 		    					OOFCount++; 
 						}
 					}
+					
+					if(isWaitingForResponse && (calendar.getTimeInMillis() > (lastSentTime + SERIAL_TIMEOUT))) {
+						isWaitingForResponse = false;
+    					logger.error("Message timed out waiting for controller to acknowledge, resending");
+					}
+					
+					if (!isWaitingForResponse) {
+						if (currentMessage == null && !this.serialInterface.sendQueue.isEmpty()) {
+							currentMessage = this.serialInterface.sendQueue.poll();
+	    					logger.debug("Getting next message from output queue");
+						}
+						
+						if (currentMessage != null) {
+    						byte[] buffer = currentMessage.getMessageBuffer();
+    						logger.debug("Sending Message = " + SerialInterface.bb2hex(buffer));
+							isWaitingForResponse = true;
+							this.serialInterface.outputStream.write(buffer);
+    						lastSentTime = calendar.getTimeInMillis();
+						}
+					}
+					
 					Thread.sleep(SLEEP_INTERVAL);
 	    		}
 			} catch (IOException e) {

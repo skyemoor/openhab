@@ -39,6 +39,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang.ArrayUtils;
 import org.openhab.binding.zwave.internal.commandclass.ZWaveBasicCommandClass;
 import org.openhab.binding.zwave.internal.commandclass.ZWaveCommandClass;
+import org.openhab.binding.zwave.internal.commandclass.ZWaveMultiInstanceCommandClass;
 import org.openhab.binding.zwave.internal.commandclass.ZWaveCommandClass.CommandClass;
 import org.openhab.binding.zwave.internal.commandclass.ZWaveManufacturerSpecificCommandClass;
 import org.openhab.binding.zwave.internal.protocol.SerialMessage.SerialMessageClass;
@@ -101,27 +102,6 @@ public class ZWaveController implements SerialInterfaceEventListener {
 		this.serialInterface.addEventListener(this);
 	}
 
-	/**
-	 * Encapsulate a multichannel message for a specific endpoint.
-	 * TODO: do this a better way.
-	 * @param endpoint The endpoint to encapsulate for.
-	 * @param message the message to encapsulate.
-	 */
-	private void encapsulate(int endpoint, SerialMessage message)
-	{
-		byte[] payload = message.getMessagePayload();
-		byte[] newPayload = new byte[payload.length + 4];
-		System.arraycopy(payload, 0, newPayload, 0, 2);
-		System.arraycopy(payload, 0, newPayload, 4, payload.length);
-		newPayload[1] += 4;
-		newPayload[2] = 0x60;
-		newPayload[3] = 0x0d;
-		newPayload[4] = 0x01;
-		newPayload[5] = (byte)(endpoint);
-		
-		message.setMessagePayload(newPayload);
-	}
-	
 	/**
 	 * Gets and resets the Last Sent Message. To be called
 	 * from the response handler. Notifies waiting
@@ -230,9 +210,8 @@ public class ZWaveController implements SerialInterfaceEventListener {
 		logger.debug("Handle Message Application Command Request");
 		int nodeId = incomingMessage.getMessagePayload()[1] & 0xFF;
 		logger.debug("Application Command Request from Node " + nodeId);
-		ZWaveNode node = getNode(nodeId);
-		
 		try {
+			ZWaveNode node = getNode(nodeId);
 			ZWaveCommandClass commandClass =  node.getCommandClass(
 					CommandClass.getCommandClass(incomingMessage.getMessagePayload()[3] & 0xFF));
 			
@@ -240,8 +219,8 @@ public class ZWaveController implements SerialInterfaceEventListener {
 			if (commandClass == null)
 				return;
 	
-			logger.debug("Found Command Class {}, passing to handleApplicationCommandRequest" + commandClass.getCommandClass().getLabel());
-			commandClass.handleApplicationCommandRequest(incomingMessage, 4);
+			logger.debug("Found Command Class {}, passing to handleApplicationCommandRequest", commandClass.getCommandClass().getLabel());
+			commandClass.handleApplicationCommandRequest(incomingMessage, 4, 1);
 		} catch (IllegalArgumentException e) {
 			logger.error(e.getLocalizedMessage());
 		}
@@ -278,6 +257,12 @@ public class ZWaveController implements SerialInterfaceEventListener {
 				if (commandClass != null)
 					node.addCommandClass(commandClass);
 			}
+			
+			// Initialize command classes
+			for (ZWaveCommandClass zwaveCommandClass : this.getNode(nodeId).getCommandClasses()) {
+				zwaveCommandClass.initialize();
+			}
+			
 			// try and get the manufacturerSpecific command class.
 			ZWaveManufacturerSpecificCommandClass manufacturerSpecific = (ZWaveManufacturerSpecificCommandClass)node.getCommandClass(CommandClass.MANUFACTURER_SPECIFIC);
 			this.zwaveNodes.get(nodeId).setQueryStageTimeStamp(Calendar.getInstance().getTime());
@@ -497,9 +482,9 @@ public class ZWaveController implements SerialInterfaceEventListener {
 		Basic basic = Basic.getBasic(incomingMessage.getMessagePayload()[3] & 0xFF);
 		Generic generic = Generic.getGeneric(incomingMessage.getMessagePayload()[4] & 0xFF);
 		Specific specific = Specific.getSpecific(generic, incomingMessage.getMessagePayload()[5] & 0xFF);
-		logger.debug(String.format("Basic = %s 0x%x", basic.getLabel(), basic.getKey()));
-		logger.debug(String.format("Generic = %s 0x%x", generic.getLabel(), generic.getKey()));
-		logger.debug(String.format("Specific = %s 0x%x", specific.getLabel(), specific.getKey()));
+		logger.debug(String.format("Basic = %s 0x%02x", basic.getLabel(), basic.getKey()));
+		logger.debug(String.format("Generic = %s 0x%02x", generic.getLabel(), generic.getKey()));
+		logger.debug(String.format("Specific = %s 0x%02x", specific.getLabel(), specific.getKey()));
 		
 		ZWaveDeviceClass deviceClass = this.zwaveNodes.get(nodeId).getDeviceClass();
 		deviceClass.setBasicDeviceClass(basic);
@@ -525,6 +510,10 @@ public class ZWaveController implements SerialInterfaceEventListener {
 			this.requestNodeInfo(nodeId);
 		}
 		else {
+			// Initialize command classes
+			for (ZWaveCommandClass zwaveCommandClass : this.getNode(nodeId).getCommandClasses()) {
+				zwaveCommandClass.initialize();
+			}
 			this.zwaveNodes.get(nodeId).setQueryStageTimeStamp(Calendar.getInstance().getTime());
 			this.zwaveNodes.get(nodeId).setNodeStage(ZWaveNode.NodeStage.NODEBUILDINFO_DONE); // do this b/c we already got the ManSpec data from previous stage (assumes Node 01 is controller)
 		}
@@ -693,18 +682,60 @@ public class ZWaveController implements SerialInterfaceEventListener {
 	public void requestLevel(int nodeId, int endpoint) {
 		ZWaveNode node = this.getNode(nodeId);
 		SerialMessage serialMessage = null;
+		ZWaveBasicCommandClass zwaveCommandClass;
 		
-		if (node.getCommandClass(CommandClass.BASIC) != null) {
-			serialMessage = ((ZWaveBasicCommandClass)node.getCommandClass(CommandClass.BASIC)).getLevelMessage();
-		}
-		
-		if (serialMessage == null) {
-			logger.error("No Command Class found on node {}, endpoint {} to request level.", nodeId, endpoint);
+		try {
+			zwaveCommandClass = (ZWaveBasicCommandClass)node.resolveCommandClass(CommandClass.BASIC, 1);
+		} catch (IllegalArgumentException e){
+			logger.error("No Command Class found on node {}, instance/endpoint {} to request level.", nodeId, endpoint);
 			return;
 		}
+			 
+		serialMessage = encapsulate(zwaveCommandClass.getLevelMessage(), node, endpoint);
 		
-		this.sendData(serialMessage);
+		if (serialMessage != null)
+			this.sendData(serialMessage);
 	}
+	
+	/**
+	 * Encapsulates a serial message for sending to a 
+	 * multi-instance instance/ multi-channel endpoint on
+	 * a node.
+	 * @param serialMessage the serial message to encapsulate
+	 * @param endpointId the instance / endpoint to encapsulate the message for
+	 * @param node the destination node.
+	 * @return SerialMessage on succes, null on failure.
+	 */
+	public SerialMessage encapsulate(SerialMessage serialMessage, ZWaveNode node, int endpointId) {
+		ZWaveMultiInstanceCommandClass multiInstanceCommandClass;
+		
+		logger.debug("Encapsulating message for node {}, instance / endpoint {}", node.getNodeId(), endpointId);
+		
+		try {
+			multiInstanceCommandClass = (ZWaveMultiInstanceCommandClass)node.getCommandClass(CommandClass.MULTI_INSTANCE);
+			logger.debug("Encapsulating message for node {}, instance / endpoint {}", node.getNodeId(), endpointId);
+			switch (multiInstanceCommandClass.getVersion()) {
+				case 2:
+					ZWaveEndpoint endpoint = multiInstanceCommandClass.getEndpoint(endpointId);
+					serialMessage = multiInstanceCommandClass.getMultiChannelEncapMessage(serialMessage, endpoint);
+					return serialMessage;
+				case 1:
+				default:
+					serialMessage = multiInstanceCommandClass.getMultiInstanceEncapMessage(serialMessage, endpointId);
+					return serialMessage;
+			}
+		} catch (IllegalArgumentException e) {
+		}
+
+		if (endpointId != 1)
+		{
+			logger.warn("Encapsulating message for node {}, instance / endpoint {} failed, will discard message.", node.getNodeId(), endpointId);
+			return null;
+		}
+		
+		return serialMessage;
+	}
+	
 	
 	/**
 	 * Transmits the SerialMessage to a single Z-Wave Node or all Z-Wave Nodes (broadcast).
@@ -745,18 +776,19 @@ public class ZWaveController implements SerialInterfaceEventListener {
 	public void sendLevel(int nodeId, int endpoint, int level) {
 		ZWaveNode node = this.getNode(nodeId);
 		SerialMessage serialMessage = null;
+		ZWaveBasicCommandClass zwaveCommandClass;
 		
-		if (node.getCommandClass(CommandClass.BASIC) != null) {
-			serialMessage = ((ZWaveBasicCommandClass)node.getCommandClass(CommandClass.BASIC)).setLevelMessage(level);
-		}
-		
-		if (serialMessage == null) {
-			logger.error("No Command Class found on node {}, endpoint {} to send level.", nodeId, endpoint);
+		try {
+			zwaveCommandClass = (ZWaveBasicCommandClass)node.resolveCommandClass(CommandClass.BASIC, 1);
+		} catch (IllegalArgumentException e){
+			logger.error("No Command Class found on node {}, instance/endpoint {} to send level.", nodeId, endpoint);
 			return;
 		}
+			 
+		serialMessage = encapsulate(zwaveCommandClass.setLevelMessage(level), node, endpoint);
 		
-		this.sendData(serialMessage);
-
+		if (serialMessage != null)
+			this.sendData(serialMessage);
 	}
 
 	

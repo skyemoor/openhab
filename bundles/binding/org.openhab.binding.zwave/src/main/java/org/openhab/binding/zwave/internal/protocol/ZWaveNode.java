@@ -28,11 +28,13 @@
  */
 package org.openhab.binding.zwave.internal.protocol;
 
+import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
 import org.openhab.binding.zwave.internal.commandclass.ZWaveCommandClass;
+import org.openhab.binding.zwave.internal.commandclass.ZWaveMultiInstanceCommandClass;
 import org.openhab.binding.zwave.internal.commandclass.ZWaveCommandClass.CommandClass;
 import org.openhab.binding.zwave.internal.protocol.ZWaveDeviceClass.Basic;
 import org.openhab.binding.zwave.internal.protocol.ZWaveDeviceClass.Generic;
@@ -293,6 +295,14 @@ public class ZWaveNode {
 	}
 
 	/**
+	 * Returns the Command classes this node implements.
+	 * @return the command classes.
+	 */
+	public Collection<ZWaveCommandClass> getCommandClasses() {
+		return supportedCommandClasses.values();
+	}
+	
+	/**
 	 * Returns a commandClass object this node implements.
 	 * @param commandClass The command class to get.
 	 * @return the command class.
@@ -318,6 +328,36 @@ public class ZWaveNode {
 		if (!supportedCommandClasses.containsKey(key))
 			supportedCommandClasses.put(key, commandClass);
 	}
+	
+	/**
+	 * Resolves a command class for this node. First endpoint is checked. 
+	 * If endpoint == 1 or (endpoint != 1 and version of the multi instance 
+	 * command == 1) then return a supported command class on the node itself. 
+	 * If endpoint != 1 and version of the multi instance command == 2 then
+	 * first try command classes of endpoints. If not found the return a  
+	 * supported command class on the node itself.
+	 * @param commandClass The command class to resolve.
+	 * @param endpointId the endpoint / instance to resolve this command class for.
+	 * @return the command class.
+	 * @throws IllegalArgumentException thrown when this node does not support this command class.
+	 */
+	public ZWaveCommandClass resolveCommandClass(CommandClass commandClass, int endpointId) throws IllegalArgumentException
+	{
+		ZWaveMultiInstanceCommandClass multiInstanceCommandClass = (ZWaveMultiInstanceCommandClass)supportedCommandClasses.get(CommandClass.MULTI_INSTANCE);
+		
+		if (multiInstanceCommandClass != null && multiInstanceCommandClass.getVersion() == 2) {
+			try {
+				ZWaveEndpoint endpoint = multiInstanceCommandClass.getEndpoint(endpointId);
+				ZWaveCommandClass result = endpoint.getCommandClass(commandClass);
+				if (result != null)
+					return result;
+			} catch (IllegalArgumentException e) {
+			}
+		}
+		
+		return getCommandClass(commandClass);
+	}
+	
 
 	/**
 	 * Node Stage Enumeration. Represents the state the node

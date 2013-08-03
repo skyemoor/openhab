@@ -78,7 +78,7 @@ public class ZWaveBasicCommandClass extends ZWaveCommandClass {
 	 */
 	@Override
 	public void handleApplicationCommandRequest(SerialMessage serialMessage,
-			int offset) {
+			int offset, int endpoint) {
 		logger.debug("Handle Message Basic Request");
 		logger.debug(String.format("Received Basic Request for Node ID = %d", this.getNode().getNodeId()));
 		int command = serialMessage.getMessagePayload()[offset] & 0xFF;
@@ -101,7 +101,7 @@ public class ZWaveBasicCommandClass extends ZWaveCommandClass {
 					valueString = "ON";
 				}
 				//TODO: Handle endpoint
-				ZWaveEvent zEvent = new ZWaveEvent(ZWaveEventType.BASIC_EVENT, this.getNode().getNodeId(), 1, valueString);
+				ZWaveEvent zEvent = new ZWaveEvent(ZWaveEventType.BASIC_EVENT, this.getNode().getNodeId(), endpoint, valueString);
 				this.getController().notifyEventListeners(zEvent);
 				break;
 			default:

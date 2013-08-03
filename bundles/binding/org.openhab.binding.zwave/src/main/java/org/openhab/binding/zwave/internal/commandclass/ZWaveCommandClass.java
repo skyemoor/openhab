@@ -54,6 +54,7 @@ public abstract class ZWaveCommandClass {
 	private final ZWaveController controller;
 	
 	private int version = 1;
+	private int instances = 1;
 	
 	/**
 	 * Protected constructor. Initiates a new instance of a Command Class.
@@ -84,6 +85,8 @@ public abstract class ZWaveCommandClass {
 	
 	/**
 	 * Sets the version of the command class.
+	 * Derived classes can override this method to execute further initialization
+	 * once the command class version is queried.
 	 * @param version
 	 */
 	protected void setVersion(int version) {
@@ -91,11 +94,55 @@ public abstract class ZWaveCommandClass {
 	}
 	
 	/**
+	 * Check the version of this command class by sending a VERSION_COMMAND_CLASS_GET message to the node.
+	 */
+	protected void checkVersion() {
+		try {
+			ZWaveVersionCommandClass versionCommandClass = (ZWaveVersionCommandClass)this.getNode().getCommandClass(CommandClass.VERSION);
+			this.getController().sendData(versionCommandClass.getCommandClassVersionMessage(this.getCommandClass()));
+		} catch (IllegalArgumentException e) {
+			logger.error(String.format("Version command class not supported on node %d," +
+					"reverting to version 1 for command class %s (0x%02x)", 
+					this.getNode().getNodeId(), 
+					this.getCommandClass().getLabel(), 
+					this.getCommandClass().getKey()));
+			setVersion(1); // trigger version update.
+		}
+	};
+	
+	/**
 	 * Returns the version of the command class.
 	 * @return node
 	 */
 	public int getVersion() {
 		return version;
+	}
+	
+	/**
+	 * Returns the number of instances of this command class
+	 * in case the node supports the MULTI_INSTANCE command class (Version 1).
+	 * @return the number of instances 
+	 */
+	public int getInstances() {
+		return instances;
+	}
+	
+	/**
+	 * Returns the number of instances of this command class
+	 * in case the node supports the MULTI_INSTANCE command class (Version 1).
+	 * @param instances. The number of instances.
+	 */
+	public void setInstances(int instances) {
+		this.instances = instances;
+	}
+	
+	/**
+	 * Initialize function. The initialize function of the command class is called after
+	 * all command classes are constructed on a node. This way dependent command classes
+	 * can be sure that all command class objects are constructed on the node.
+	 */
+	public void initialize() {
+		logger.debug("Command class {} initializing", getCommandClass().getLabel());
 	}
 	
 	/**
@@ -108,8 +155,9 @@ public abstract class ZWaveCommandClass {
 	 * Handles an incoming application command request.
 	 * @param serialMessage the incoming message to process.
 	 * @param offset the offset position from which to start message processing.
+	 * @param endpoint the endpoint or instance number this message is meant for.
 	 */
-	public abstract void handleApplicationCommandRequest(SerialMessage serialMessage, int offset);
+	public abstract void handleApplicationCommandRequest(SerialMessage serialMessage, int offset, int endpoint);
 
 	/**
 	 * Gets an instance of the right command class.
@@ -186,7 +234,7 @@ public abstract class ZWaveCommandClass {
 		SCHEDULE_ENTRY_LOCK(0x4E,"SCHEDULE_ENTRY_LOCK",null),
 		BASIC_WINDOW_COVERING(0x50,"BASIC_WINDOW_COVERING",null),
 		MTP_WINDOW_COVERING(0x51,"MTP_WINDOW_COVERING",null),
-		MULTI_INSTANCE(0x60,"MULTI_INSTANCE",null),
+		MULTI_INSTANCE(0x60,"MULTI_INSTANCE",ZWaveMultiInstanceCommandClass.class),
 		DOOR_LOCK(0x62,"DOOR_LOCK",null),
 		USER_CODE(0x63,"USER_CODE",null),
 		CONFIGURATION(0x70,"CONFIGURATION",null),
@@ -205,7 +253,7 @@ public abstract class ZWaveCommandClass {
 		HAIL(0x82,"HAIL",null),
 		WAKE_UP(0x84,"WAKE_UP",null),
 		ASSOCIATION(0x85,"ASSOCIATION",null),
-		VERSION(0x86,"VERSION",null),
+		VERSION(0x86,"VERSION",ZWaveVersionCommandClass.class),
 		INDICATOR(0x87,"INDICATOR",null),
 		PROPRIETARY(0x88,"PROPRIETARY",null),
 		LANGUAGE(0x89,"LANGUAGE",null),

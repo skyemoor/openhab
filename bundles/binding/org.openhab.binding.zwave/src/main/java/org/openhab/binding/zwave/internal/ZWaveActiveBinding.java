@@ -379,6 +379,7 @@ public class ZWaveActiveBinding extends AbstractActiveBinding<ZWaveBindingProvid
 
 	/**
 	 * Event handler method for incoming Z-Wave events.
+	 * @param event the incoming Z-Wave event.
 	 */
 	@Override
 	public void ZWaveIncomingEvent(ZWaveEvent event) {

@@ -36,6 +36,8 @@ import org.openhab.binding.zwave.internal.protocol.SerialMessage;
 import org.openhab.binding.zwave.internal.protocol.ZWaveController;
 import org.openhab.binding.zwave.internal.protocol.ZWaveEvent;
 import org.openhab.binding.zwave.internal.protocol.ZWaveNode;
+import org.openhab.binding.zwave.internal.protocol.SerialMessage.SerialMessageClass;
+import org.openhab.binding.zwave.internal.protocol.SerialMessage.SerialMessageType;
 import org.openhab.binding.zwave.internal.protocol.ZWaveEvent.ZWaveEventType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -80,7 +82,7 @@ public class ZWaveVersionCommandClass extends ZWaveCommandClass {
 	 */
 	@Override
 	public void handleApplicationCommandRequest(SerialMessage serialMessage,
-			int offset) {
+			int offset, int endpoint) {
 		logger.debug("Handle Message Version Request");
 		logger.debug(String.format("Received Version Request for Node ID = %d", this.getNode().getNodeId()));
 		int command = serialMessage.getMessagePayload()[offset] & 0xFF;
@@ -90,7 +92,7 @@ public class ZWaveVersionCommandClass extends ZWaveCommandClass {
 				logger.warn(String.format("Command 0x%02X not implemented.", command));
 				return;
 			case VERSION_REPORT:
-				logger.debug(String.format("Received Version Report Response for Node ID = %d", this.getNode().getNodeId()));
+				logger.debug("Process Version Report");
 				int libraryType = serialMessage.getMessagePayload()[offset + 1] & 0xFF;
 				int protocolVersion = serialMessage.getMessagePayload()[offset + 2] & 0xFF;
 				int protocolSubVersion = serialMessage.getMessagePayload()[offset + 3] & 0xFF;
@@ -106,7 +108,7 @@ public class ZWaveVersionCommandClass extends ZWaveCommandClass {
 				// Nothing to do with this info, not exactly useful.
 				break;
 			case VERSION_COMMAND_CLASS_REPORT:
-				logger.debug(String.format("Received Command Class Version Report Response for Node ID = %d", this.getNode().getNodeId()));
+				logger.debug("Process Version Command Class Report");
 				int commandClassCode = serialMessage.getMessagePayload()[offset + 1] & 0xFF;
 				int commandClassVersion = serialMessage.getMessagePayload()[offset + 2] & 0xFF;
 				
@@ -133,5 +135,40 @@ public class ZWaveVersionCommandClass extends ZWaveCommandClass {
 					this.getCommandClass().getLabel(),
 					this.getCommandClass().getKey()));
 		}
+	}
+	
+	/**
+	 * Gets a SerialMessage with the VERSION GET command 
+	 * @return the serial message
+	 */
+	public SerialMessage getVersionMessage() {
+		logger.debug("Creating new message for application command VERSION_GET for node {}", this.getNode().getNodeId());
+		SerialMessage result = new SerialMessage(SerialMessageClass.SendData, SerialMessageType.Request);
+    	byte[] newPayload = { 	(byte) this.getNode().getNodeId(), 
+    							2, 
+								(byte) getCommandClass().getKey(), 
+								(byte) VERSION_GET };
+    	result.setMessagePayload(newPayload);
+    	return result;		
+	}
+	
+	/**
+	 * Gets a SerialMessage with the VERSION COMMAND CLASS GET command.
+	 * This version is used to differentiate between multiple versions of a command
+	 * and to enable extra functionality. 
+	 * @param commandClass The command class to get the version for.
+	 * @return the serial message
+	 */
+	public SerialMessage getCommandClassVersionMessage(CommandClass commandClass) {
+	logger.debug("Creating new message for application command VERSION_COMMAND_CLASS_GET for node {} and command class {}", this.getNode().getNodeId(), commandClass.getLabel());
+		SerialMessage result = new SerialMessage(SerialMessageClass.SendData, SerialMessageType.Request);
+    	byte[] newPayload = { 	(byte) this.getNode().getNodeId(), 
+    							3, 
+								(byte) getCommandClass().getKey(), 
+								(byte) VERSION_COMMAND_CLASS_GET,
+								(byte) commandClass.getKey()
+								};
+    	result.setMessagePayload(newPayload);
+    	return result;		
 	}
 }

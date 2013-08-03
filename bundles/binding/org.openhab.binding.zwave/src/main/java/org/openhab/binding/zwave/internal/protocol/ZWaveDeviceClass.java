@@ -288,21 +288,21 @@ public class ZWaveDeviceClass {
 				case WINDOW_COVERING:
 				case THERMOSTAT:
 				case AV_CONTROL_POINT:
-					return new CommandClass[] { CommandClass.BASIC };
+					return new CommandClass[] { CommandClass.NO_OPERATION, CommandClass.BASIC };
 				case BINARY_SWITCH:
-					return new CommandClass[] { CommandClass.BASIC, CommandClass.SWITCH_BINARY };
+					return new CommandClass[] { CommandClass.NO_OPERATION, CommandClass.BASIC, CommandClass.SWITCH_BINARY };
 				case MULTILEVEL_SWITCH:
-					return new CommandClass[] { CommandClass.BASIC, CommandClass.SWITCH_MULTILEVEL };
+					return new CommandClass[] { CommandClass.NO_OPERATION, CommandClass.BASIC, CommandClass.SWITCH_MULTILEVEL };
 				case BINARY_SENSOR:
-					return new CommandClass[] { CommandClass.BASIC, CommandClass.SENSOR_BINARY };
+					return new CommandClass[] { CommandClass.NO_OPERATION, CommandClass.BASIC, CommandClass.SENSOR_BINARY };
 				case MULTILEVEL_SENSOR:
-					return new CommandClass[] { CommandClass.BASIC, CommandClass.SENSOR_MULTILEVEL };
+					return new CommandClass[] { CommandClass.NO_OPERATION, CommandClass.BASIC, CommandClass.SENSOR_MULTILEVEL };
 				case PULSE_METER:
-					return new CommandClass[] { CommandClass.BASIC, CommandClass.METER_PULSE };
+					return new CommandClass[] { CommandClass.NO_OPERATION, CommandClass.BASIC, CommandClass.METER_PULSE };
 				case ENTRY_CONTROL:
-					return new CommandClass[] { CommandClass.BASIC, CommandClass.LOCK };
+					return new CommandClass[] { CommandClass.NO_OPERATION, CommandClass.BASIC, CommandClass.LOCK };
 				case SEMI_INTEROPERABLE:
-					return new CommandClass[] { CommandClass.BASIC, CommandClass.MANUFACTURER_SPECIFIC, CommandClass.VERSION, CommandClass.PROPRIETARY };
+					return new CommandClass[] { CommandClass.NO_OPERATION, CommandClass.BASIC, CommandClass.MANUFACTURER_SPECIFIC, CommandClass.VERSION, CommandClass.PROPRIETARY };
 				default:
 					return new CommandClass[0];
 			}

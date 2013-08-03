@@ -72,7 +72,7 @@ public class ZWaveManufacturerSpecificCommandClass extends ZWaveCommandClass {
 	 */
 	@Override
 	public void handleApplicationCommandRequest(SerialMessage serialMessage,
-			int offset) {
+			int offset, int endpoint) {
 
 		logger.debug("Handle Message Manufacture Specific Request");
 		logger.debug(String.format("Received Manufacture Specific Information for Node ID = %d", this.getNode().getNodeId()));
