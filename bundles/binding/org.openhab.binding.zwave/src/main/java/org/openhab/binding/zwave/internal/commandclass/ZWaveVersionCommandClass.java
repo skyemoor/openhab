@@ -125,6 +125,15 @@ public class ZWaveVersionCommandClass extends ZWaveCommandClass {
 					zwaveCommandClass.setVersion(commandClassVersion);
 					
 					logger.debug(String.format("Node %d Version = %d, version set. Enabling extra functionality.", this.getNode().getNodeId(), commandClassVersion));
+					
+					for (ZWaveCommandClass zCC : this.getNode().getCommandClasses()) {
+						// wait for all nodes to get/set version information before advancing to the next stage.
+						if (zCC.getVersion() == 0)
+							return;
+					}
+					// advance node stage;
+					this.getNode().advanceNodeStage();
+					
 				} catch (IllegalArgumentException e) {
 					logger.error("Error setting version on command class 0x%02x", commandClassCode);
 				}
@@ -171,4 +180,21 @@ public class ZWaveVersionCommandClass extends ZWaveCommandClass {
     	result.setMessagePayload(newPayload);
     	return result;		
 	}
+	
+	/**
+	 * Check the version of a command class by sending a VERSION_COMMAND_CLASS_GET message to the node.
+	 * @param the command class to check the version for.
+	 */
+	public void checkVersion(ZWaveCommandClass commandClass) {
+		try {
+			ZWaveVersionCommandClass versionCommandClass = (ZWaveVersionCommandClass)this.getNode().getCommandClass(CommandClass.VERSION);
+			this.getController().sendData(versionCommandClass.getCommandClassVersionMessage(commandClass.getCommandClass()));
+		} catch (IllegalArgumentException e) {
+			logger.error(String.format("Version command class not supported on node %d," +
+					"reverting to version 1 for command class %s (0x%02x)", 
+					this.getNode().getNodeId(), 
+					commandClass.getCommandClass().getLabel(), 
+					commandClass.getCommandClass().getKey()));
+		}
+	};
 }

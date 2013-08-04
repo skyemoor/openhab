@@ -28,17 +28,22 @@
  */
 package org.openhab.binding.zwave.internal.protocol;
 
+import java.util.Calendar;
 import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
 import org.openhab.binding.zwave.internal.commandclass.ZWaveCommandClass;
+import org.openhab.binding.zwave.internal.commandclass.ZWaveManufacturerSpecificCommandClass;
 import org.openhab.binding.zwave.internal.commandclass.ZWaveMultiInstanceCommandClass;
+import org.openhab.binding.zwave.internal.commandclass.ZWaveVersionCommandClass;
 import org.openhab.binding.zwave.internal.commandclass.ZWaveCommandClass.CommandClass;
 import org.openhab.binding.zwave.internal.protocol.ZWaveDeviceClass.Basic;
 import org.openhab.binding.zwave.internal.protocol.ZWaveDeviceClass.Generic;
 import org.openhab.binding.zwave.internal.protocol.ZWaveDeviceClass.Specific;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Z-Wave node class. Represents a node in the Z-Wave network.
@@ -47,7 +52,10 @@ import org.openhab.binding.zwave.internal.protocol.ZWaveDeviceClass.Specific;
  */
 public class ZWaveNode {
 
+	private static final Logger logger = LoggerFactory.getLogger(ZWaveNode.class);
+
 	private final ZWaveDeviceClass deviceClass;
+	private final ZWaveController controller;
 
 	private int homeId;
 	private int nodeId;
@@ -76,11 +84,13 @@ public class ZWaveNode {
 	 * @param homeId the home ID to use.
 	 * @param nodeId the node ID to use.
 	 */
-	public ZWaveNode(int homeId, int nodeId) {
+	public ZWaveNode(int homeId, int nodeId, ZWaveController controller) {
 		this.homeId = homeId;
 		this.nodeId = nodeId;
+		this.controller = controller;
 		this.nodeStage = NodeStage.NODEBUILDINFO_EMPTYNODE;
 		this.deviceClass = new ZWaveDeviceClass(Basic.NOT_KNOWN, Generic.NOT_KNOWN, Specific.NOT_USED);
+		this.lastUpdated = Calendar.getInstance().getTime();
 	}
 
 	/**
@@ -105,6 +115,7 @@ public class ZWaveNode {
 	 */
 	public void setListening(boolean listening) {
 		this.listening = listening;
+		this.lastUpdated = Calendar.getInstance().getTime();
 	}
 
 	/**
@@ -140,6 +151,7 @@ public class ZWaveNode {
 	 */
 	public void setName(String name) {
 		this.name = name;
+		this.lastUpdated = Calendar.getInstance().getTime();
 	}
 
 	/**
@@ -156,6 +168,7 @@ public class ZWaveNode {
 	 */
 	public void setLocation(String location) {
 		this.location = location;
+		this.lastUpdated = Calendar.getInstance().getTime();
 	}
 
 	/**
@@ -172,6 +185,7 @@ public class ZWaveNode {
 	 */
 	public void setManufacturer(int tempMan) {
 		this.manufacturer = tempMan;
+		this.lastUpdated = Calendar.getInstance().getTime();
 	}
 
 	/**
@@ -188,6 +202,7 @@ public class ZWaveNode {
 	 */
 	public void setDeviceId(int tempDeviceId) {
 		this.deviceId = tempDeviceId;
+		this.lastUpdated = Calendar.getInstance().getTime();
 	}
 
 	/**
@@ -204,6 +219,7 @@ public class ZWaveNode {
 	 */
 	public void setDeviceType(int tempDeviceType) {
 		this.deviceType = tempDeviceType;
+		this.lastUpdated = Calendar.getInstance().getTime();
 	}
 
 	/**
@@ -212,14 +228,6 @@ public class ZWaveNode {
 	 */
 	public Date getLastUpdated() {
 		return lastUpdated;
-	}
-
-	/**
-	 * Set the date/time the node was last updated.
-	 * @param lastUpdated the lastUpdated to set
-	 */
-	public void setLastUpdated(Date lastUpdated) {
-		this.lastUpdated = lastUpdated;
 	}
 
 	/**
@@ -235,8 +243,8 @@ public class ZWaveNode {
 	 * @param nodeStage the nodeStage to set
 	 */
 	public void setNodeStage(NodeStage nodeStage) {
-		
 		this.nodeStage = nodeStage;
+		this.lastUpdated = Calendar.getInstance().getTime();
 	}
 
 	/**
@@ -253,6 +261,7 @@ public class ZWaveNode {
 	 */
 	public void setVersion(int version) {
 		this.version = version;
+		this.lastUpdated = Calendar.getInstance().getTime();
 	}
 
 	/**
@@ -269,6 +278,7 @@ public class ZWaveNode {
 	 */
 	public void setRouting(boolean routing) {
 		this.routing = routing;
+		this.lastUpdated = Calendar.getInstance().getTime();
 	}
 
 	/**
@@ -285,6 +295,7 @@ public class ZWaveNode {
 	 */
 	public void setQueryStageTimeStamp(Date queryStageTimeStamp) {
 		this.queryStageTimeStamp = queryStageTimeStamp;
+		this.lastUpdated = Calendar.getInstance().getTime();
 	}
 
 	/**
@@ -325,8 +336,10 @@ public class ZWaveNode {
 	{
 		CommandClass key = commandClass.getCommandClass();
 		
-		if (!supportedCommandClasses.containsKey(key))
+		if (!supportedCommandClasses.containsKey(key)) {
 			supportedCommandClasses.put(key, commandClass);
+			this.lastUpdated = Calendar.getInstance().getTime();
+		}
 	}
 	
 	/**
@@ -356,6 +369,86 @@ public class ZWaveNode {
 		}
 		
 		return getCommandClass(commandClass);
+	}
+	
+	/**
+	 * Advances the initialization stage for this node. 
+	 * Every node follows a certain path through it's 
+	 * initialization phase. These stages are visited one by
+	 * one to finally end up with a completely built node structure
+	 * through querying the controller / node.
+	 * TODO: Handle the rest of the node stages 
+	 */
+	public void advanceNodeStage() {
+		this.setQueryStageTimeStamp(Calendar.getInstance().getTime());
+		switch (this.nodeStage) {
+			case NODEBUILDINFO_EMPTYNODE:
+				try {
+					this.setNodeStage(ZWaveNode.NodeStage.NODEBUILDINFO_PROTOINFO);
+					this.controller.identifyNode(this.nodeId);
+				} catch (SerialInterfaceException e) {
+					logger.error("Got error: {}, while identifying node {}", e.getLocalizedMessage(), this.nodeId);
+				}
+				break;
+			case NODEBUILDINFO_PROTOINFO:
+				if (nodeId != this.controller.getOwnNodeId())
+				{
+					this.setNodeStage(ZWaveNode.NodeStage.NODEBUILDINFO_DETAILS);
+					this.controller.requestNodeInfo(nodeId);
+				} else
+				{
+					this.setNodeStage(ZWaveNode.NodeStage.NODEBUILDINFO_DONE); // nothing more to do for this node.
+				}
+				break;
+			case NODEBUILDINFO_DETAILS:
+				// try and get the manufacturerSpecific command class.
+				try {
+					ZWaveManufacturerSpecificCommandClass manufacturerSpecific = (ZWaveManufacturerSpecificCommandClass)this.getCommandClass(CommandClass.MANUFACTURER_SPECIFIC);
+					
+					// if this node implements the Manufacturer Specific command class, we use it to get manufacturer info.
+					this.setNodeStage(ZWaveNode.NodeStage.NODEBUILDINFO_MANSPEC01);
+					this.controller.sendData(manufacturerSpecific.getManufacturerSpecificMessage());
+					break;
+				} catch (IllegalArgumentException ex) {
+					logger.warn("Node {} does not support MANUFACTURER_SPECIFIC, proceeding to version node stage.", this.getNodeId());
+				}
+			case NODEBUILDINFO_MANSPEC01:
+				this.setNodeStage(ZWaveNode.NodeStage.NODEBUILDINFO_VERSION); // nothing more to do for this node.
+				// try and get the version command class.
+				try {
+					ZWaveVersionCommandClass version = (ZWaveVersionCommandClass)this.getCommandClass(CommandClass.VERSION);
+					boolean checkVersionCalled = false;
+					for (ZWaveCommandClass zwaveCommandClass : this.getCommandClasses()) {
+						if (version != null && zwaveCommandClass.getMaxVersion() > 1) {
+							version.checkVersion(zwaveCommandClass); // check version for this command class.
+							checkVersionCalled = true;				
+						} else
+							zwaveCommandClass.setVersion(1);  
+					}
+					
+					if (checkVersionCalled) // wait for another call of advanceNodeStage before continuing.
+						break;
+				} catch (IllegalArgumentException ex) {
+					logger.warn("Node {} does not support VERSION, proceeding to instances node stage.", this.getNodeId());
+					for (ZWaveCommandClass zwaveCommandClass : this.getCommandClasses()) {
+						zwaveCommandClass.setVersion(1);
+					}
+				}
+			case NODEBUILDINFO_VERSION:
+				this.setNodeStage(ZWaveNode.NodeStage.NODEBUILDINFO_INSTANCES); // nothing more to do for this node.
+				try {
+					// try and get the multi instance / channel command class.
+					ZWaveMultiInstanceCommandClass multiInstance = (ZWaveMultiInstanceCommandClass)this.getCommandClass(CommandClass.MULTI_INSTANCE);
+
+					multiInstance.initialize();
+					break;
+				} catch (IllegalArgumentException ex) {
+					logger.warn("Node {} does not support MULTI_INSTANCE, proceeding to done node stage.", this.getNodeId());
+				}
+			case NODEBUILDINFO_INSTANCES:
+				this.setNodeStage(ZWaveNode.NodeStage.NODEBUILDINFO_DONE);
+				
+		}
 	}
 	
 
@@ -393,8 +486,8 @@ public class ZWaveNode {
 		NODEBUILDINFO_PROTOINFO(1, "Protocol Information"),
 		NODEBUILDINFO_PING(2, "Ping Node"),
 		NODEBUILDINFO_WAKEUP(3, "Wake Up"),
-		NODEBUILDINFO_MANSPEC01(4, "Manufacture Name and Product Identification"),
-		NODEBUILDINFO_DETAILS(5, "Node Information"),
+		NODEBUILDINFO_DETAILS(4, "Node Information"),
+		NODEBUILDINFO_MANSPEC01(5, "Manufacture Name and Product Identification"),
 		NODEBUILDINFO_MANSPEC02(6, "Manufacture Name and Product Identification"),
 		NODEBUILDINFO_VERSION(7, "Node Version"),
 		NODEBUILDINFO_INSTANCES(8, "Command Class Instances"),

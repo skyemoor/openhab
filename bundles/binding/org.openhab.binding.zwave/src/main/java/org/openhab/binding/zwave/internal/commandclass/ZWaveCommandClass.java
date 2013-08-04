@@ -53,8 +53,8 @@ public abstract class ZWaveCommandClass {
 	private final ZWaveNode node;
 	private final ZWaveController controller;
 	
-	private int version = 1;
-	private int instances = 1;
+	private int version = 0;
+	private int instances = 0;
 	
 	/**
 	 * Protected constructor. Initiates a new instance of a Command Class.
@@ -84,38 +84,26 @@ public abstract class ZWaveCommandClass {
 	}
 	
 	/**
-	 * Sets the version of the command class.
-	 * Derived classes can override this method to execute further initialization
-	 * once the command class version is queried.
-	 * @param version
-	 */
-	protected void setVersion(int version) {
-		this.version = version;
-	}
-	
-	/**
-	 * Check the version of this command class by sending a VERSION_COMMAND_CLASS_GET message to the node.
-	 */
-	protected void checkVersion() {
-		try {
-			ZWaveVersionCommandClass versionCommandClass = (ZWaveVersionCommandClass)this.getNode().getCommandClass(CommandClass.VERSION);
-			this.getController().sendData(versionCommandClass.getCommandClassVersionMessage(this.getCommandClass()));
-		} catch (IllegalArgumentException e) {
-			logger.error(String.format("Version command class not supported on node %d," +
-					"reverting to version 1 for command class %s (0x%02x)", 
-					this.getNode().getNodeId(), 
-					this.getCommandClass().getLabel(), 
-					this.getCommandClass().getKey()));
-			setVersion(1); // trigger version update.
-		}
-	};
-	
-	/**
 	 * Returns the version of the command class.
 	 * @return node
 	 */
 	public int getVersion() {
 		return version;
+	}
+	
+	/**
+	 * Sets the version number for this command class.
+	 * @param version. The version number to set.
+	 */
+	public void setVersion(int version) {
+		this.version = version;
+	}
+	
+	/**
+	 * The maximum version implemented by this command class.
+	 */
+	public int getMaxVersion () {
+		return 1;
 	}
 	
 	/**
@@ -134,15 +122,6 @@ public abstract class ZWaveCommandClass {
 	 */
 	public void setInstances(int instances) {
 		this.instances = instances;
-	}
-	
-	/**
-	 * Initialize function. The initialize function of the command class is called after
-	 * all command classes are constructed on a node. This way dependent command classes
-	 * can be sure that all command class objects are constructed on the node.
-	 */
-	public void initialize() {
-		logger.debug("Command class {} initializing", getCommandClass().getLabel());
 	}
 	
 	/**

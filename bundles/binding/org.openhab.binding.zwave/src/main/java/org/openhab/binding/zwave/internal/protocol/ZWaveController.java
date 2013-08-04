@@ -212,15 +212,18 @@ public class ZWaveController implements SerialInterfaceEventListener {
 		logger.debug("Application Command Request from Node " + nodeId);
 		try {
 			ZWaveNode node = getNode(nodeId);
-			ZWaveCommandClass commandClass =  node.getCommandClass(
-					CommandClass.getCommandClass(incomingMessage.getMessagePayload()[3] & 0xFF));
+			
+			CommandClass commandClass = CommandClass.getCommandClass(incomingMessage.getMessagePayload()[3] & 0xFF);
+			logger.debug("Incoming command class %s (0x%02x)", commandClass.getLabel(), commandClass.getKey());
+			
+			ZWaveCommandClass zwaveCommandClass =  node.getCommandClass(commandClass);
 			
 			// We got an unsupported command class, return.
-			if (commandClass == null)
+			if (zwaveCommandClass == null)
 				return;
 	
-			logger.debug("Found Command Class {}, passing to handleApplicationCommandRequest", commandClass.getCommandClass().getLabel());
-			commandClass.handleApplicationCommandRequest(incomingMessage, 4, 1);
+			logger.debug("Found Command Class {}, passing to handleApplicationCommandRequest", zwaveCommandClass.getCommandClass().getLabel());
+			zwaveCommandClass.handleApplicationCommandRequest(incomingMessage, 4, 1);
 		} catch (IllegalArgumentException e) {
 			logger.error(e.getLocalizedMessage());
 		}
@@ -230,7 +233,6 @@ public class ZWaveController implements SerialInterfaceEventListener {
 	 * Handles incoming Application Update Request.
 	 * @param incomingMessage the request message to process.
 	 * JWS: Update states that are not implemented yet are commented out.
-	 *  
 	 */
 	private void handleApplicationUpdateRequest(SerialMessage incomingMessage) {
 		logger.debug("Handle Message Application Update Request");
@@ -258,23 +260,9 @@ public class ZWaveController implements SerialInterfaceEventListener {
 					node.addCommandClass(commandClass);
 			}
 			
-			// Initialize command classes
-			for (ZWaveCommandClass zwaveCommandClass : this.getNode(nodeId).getCommandClasses()) {
-				zwaveCommandClass.initialize();
-			}
+			// advance node stage.
+			node.advanceNodeStage();
 			
-			// try and get the manufacturerSpecific command class.
-			ZWaveManufacturerSpecificCommandClass manufacturerSpecific = (ZWaveManufacturerSpecificCommandClass)node.getCommandClass(CommandClass.MANUFACTURER_SPECIFIC);
-			this.zwaveNodes.get(nodeId).setQueryStageTimeStamp(Calendar.getInstance().getTime());
-
-			// if this node implements the Manufacturer Specific command class, we use it to get manufacturer info.
-			if (manufacturerSpecific != null) {
-				this.zwaveNodes.get(nodeId).setNodeStage(ZWaveNode.NodeStage.NODEBUILDINFO_MANSPEC01);
-				SerialMessage serialMessage = manufacturerSpecific.getManufacturerSpecificMessage();
-				this.sendData(serialMessage);
-			} else {
-				this.zwaveNodes.get(nodeId).setNodeStage(ZWaveNode.NodeStage.NODEBUILDINFO_DONE); // nothing more to do for this node.
-			}
 			break;
 //		case NODE_INFO_REQ_DONE:
 //			logger.debug("Application update request, need to handle Node Info Request Done.");
@@ -421,7 +409,7 @@ public class ZWaveController implements SerialInterfaceEventListener {
 				if (b1 == b2) {
 					logger.info(String.format("Found node id = %d", nodeId));
 					// Place nodes in the local ZWave Controller 
-					this.zwaveNodes.put(nodeId, new ZWaveNode(this.homeId, nodeId));
+					this.zwaveNodes.put(nodeId, new ZWaveNode(this.homeId, nodeId, this));
 					
 					if (firstNodeId == -1)
 						firstNodeId = nodeId;
@@ -435,12 +423,8 @@ public class ZWaveController implements SerialInterfaceEventListener {
 		logger.info(String.format("# Nodes = %d", this.zwaveNodes.size()));
 		logger.info("----------------------------------------------------------------------------");
 		
-		try {
-			// Ask controller for node identification of first node
-			this.identifyNode(firstNodeId);
-		} catch (SerialInterfaceException e) {
-			logger.error(e.getLocalizedMessage());
-		}
+		// Advance node stage for the first node.
+		this.getNode(firstNodeId).advanceNodeStage();
 	}
 
 	/**
@@ -505,21 +489,9 @@ public class ZWaveController implements SerialInterfaceEventListener {
 				this.zwaveNodes.get(nodeId).addCommandClass(zwaveCommandClass);
 		}
 
-		if(nodeId != this.ownNodeId)
-		{
-			this.requestNodeInfo(nodeId);
-		}
-		else {
-			// Initialize command classes
-			for (ZWaveCommandClass zwaveCommandClass : this.getNode(nodeId).getCommandClasses()) {
-				zwaveCommandClass.initialize();
-			}
-			this.zwaveNodes.get(nodeId).setQueryStageTimeStamp(Calendar.getInstance().getTime());
-			this.zwaveNodes.get(nodeId).setNodeStage(ZWaveNode.NodeStage.NODEBUILDINFO_DONE); // do this b/c we already got the ManSpec data from previous stage (assumes Node 01 is controller)
-		}
+    	// advance node stage of the current node.
+		this.getNode(nodeId).advanceNodeStage();
 			
-	    this.zwaveNodes.get(nodeId).setLastUpdated(Calendar.getInstance().getTime());
-	    
 	    for (Map.Entry<Integer, ZWaveNode> entry : zwaveNodes.entrySet())
 	    {
 	    	NodeStage stage = entry.getValue().getNodeStage();
@@ -527,13 +499,9 @@ public class ZWaveController implements SerialInterfaceEventListener {
 	    	
 	    	if (stage != ZWaveNode.NodeStage.NODEBUILDINFO_PROTOINFO && stage != ZWaveNode.NodeStage.NODEBUILDINFO_EMPTYNODE)
 	    		continue;
-	    	
-	    	try {
-		    	// identify next node.
-				this.identifyNode(entry.getKey());
-			} catch (SerialInterfaceException e) {
-				logger.error(e.getLocalizedMessage());
-			}
+
+	    	// advance node stage of the next node.
+	    	entry.getValue().advanceNodeStage();
 	    	return;
 	    }
 	}
@@ -613,8 +581,6 @@ public class ZWaveController implements SerialInterfaceEventListener {
 	 * @throws SerialInterfaceException when timing out or getting an invalid response.
 	 */
 	public void identifyNode(int nodeId) throws SerialInterfaceException {
-		this.zwaveNodes.get(nodeId).setQueryStageTimeStamp(Calendar.getInstance().getTime());
-		this.zwaveNodes.get(nodeId).setNodeStage(ZWaveNode.NodeStage.NODEBUILDINFO_PROTOINFO);
 		SerialMessage newMessage = new SerialMessage(nodeId, SerialMessageClass.IdentifyNode, SerialMessageType.Request);
     	byte[] newPayload = { (byte) nodeId };
     	newMessage.setMessagePayload(newPayload);
@@ -628,8 +594,6 @@ public class ZWaveController implements SerialInterfaceEventListener {
 	 * @throws SerialInterfaceException when timing out or getting an invalid response.
 	 */
 	public void requestNodeInfo(int nodeId) {
-		this.zwaveNodes.get(nodeId).setQueryStageTimeStamp(Calendar.getInstance().getTime());
-		this.zwaveNodes.get(nodeId).setNodeStage(ZWaveNode.NodeStage.NODEBUILDINFO_DETAILS);
 		SerialMessage newMessage = new SerialMessage(nodeId, SerialMessageClass.RequestNodeInfo, SerialMessageType.Request);
     	byte[] newPayload = { (byte) nodeId };
     	newMessage.setMessagePayload(newPayload);
@@ -861,6 +825,14 @@ public class ZWaveController implements SerialInterfaceEventListener {
 	 */
 	public int getDeviceId() {
 		return deviceId;
+	}
+	
+	/**
+	 * Gets the node ID of the controller.
+	 * @return the deviceId
+	 */
+	public int getOwnNodeId() {
+		return ownNodeId;
 	}
 
 	/**

@@ -401,6 +401,7 @@ public class ZWaveActiveBinding extends AbstractActiveBinding<ZWaveBindingProvid
 		
 		logger.debug("ZwaveIncomingEvent");
 		switch (event.getEventType()) {
+			case BASIC_EVENT:
 			case SWITCH_EVENT:
 			case DIMMER_EVENT:
 				logger.debug("Got a " + event.getEventType() + " event from Z-Wave network for nodeId = {}, state = {}, endpoint = {}", new Object[] { event.getNodeId(), event.getEventValue(), event.getEndpoint() } );
@@ -430,6 +431,7 @@ public class ZWaveActiveBinding extends AbstractActiveBinding<ZWaveBindingProvid
 				}
 				break;
 			default:
+				logger.warn("Unknown event type {}", event.getEventType());
 				break;
 		}
 	}

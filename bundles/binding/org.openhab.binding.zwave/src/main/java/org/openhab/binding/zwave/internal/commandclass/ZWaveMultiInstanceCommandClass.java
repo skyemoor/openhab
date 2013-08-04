@@ -89,43 +89,17 @@ public class ZWaveMultiInstanceCommandClass extends ZWaveCommandClass {
 	 * {@inheritDoc}
 	 */
 	@Override
-	protected void setVersion(int version) {
-		switch (version) {
-			case 1:
-				// get number of instances for all command classes on this node.
-				for (ZWaveCommandClass commandClass : this.getNode().getCommandClasses()) {
-					if (commandClass.getCommandClass() == CommandClass.NO_OPERATION)
-						continue;
-					this.getController().sendData(this.getMultiInstanceGetMessage(commandClass.getCommandClass()));
-				}
-				break;
-			case 2:
-				this.getController().sendData(this.getMultiChannelEndpointGetMessage());
-				break;
-			default:
-				logger.warn(String.format("Unknown version %d for command class %s (0x%02x)", 
-						version, this.getCommandClass().getLabel(), this.getCommandClass().getKey()));
-				return; // don't set unknown version, revert to 1.
-		}
-		super.setVersion(version);
-	};
-
-	/**
-	 * {@inheritDoc}
-	 */
-	@Override
-	public void initialize() {
-		super.initialize();
-		checkVersion();
-	}
-	
-	/**
-	 * {@inheritDoc}
-	 */
-	@Override
 	public CommandClass getCommandClass() {
 		return CommandClass.MULTI_INSTANCE;
 	}
+	
+	/**
+	 * {@inheritDoc} 
+	 */
+	@Override
+	public int getMaxVersion() {
+		return 2;
+	};
 
 	/**
 	 * Gets the endpoint object using it's endpoint ID as key.
@@ -193,18 +167,27 @@ public class ZWaveMultiInstanceCommandClass extends ZWaveCommandClass {
 		int commandClassCode = serialMessage.getMessagePayload()[offset] & 0xFF;
 		int instances = serialMessage.getMessagePayload()[offset + 1] & 0xFF;
 
-		if (instances == 0)
-			return; // the command class does not support multiple instances.
-
-		try {
-			CommandClass commandClass = CommandClass.getCommandClass(commandClassCode);
-			logger.debug(String.format("Node %d Requested Command Class = %s (0x%02x)", this.getNode().getNodeId(), commandClass.getLabel() , commandClassCode));
-			ZWaveCommandClass zwaveCommandClass = this.getNode().getCommandClass(commandClass);
-			zwaveCommandClass.setInstances(instances);
-			logger.debug(String.format("Node %d Instances = %d, number of instances set.", this.getNode().getNodeId(), instances));
-		} catch (IllegalArgumentException e) {
-			logger.error(String.format("Unsupported commandClass (0x%02x) encountered.", commandClassCode));
+		if (instances == 0) {
+			setInstances(1);
+		} else 
+		{
+			try {
+				CommandClass commandClass = CommandClass.getCommandClass(commandClassCode);
+				logger.debug(String.format("Node %d Requested Command Class = %s (0x%02x)", this.getNode().getNodeId(), commandClass.getLabel() , commandClassCode));
+				ZWaveCommandClass zwaveCommandClass = this.getNode().getCommandClass(commandClass);
+				zwaveCommandClass.setInstances(instances);
+				logger.debug(String.format("Node %d Instances = %d, number of instances set.", this.getNode().getNodeId(), instances));
+			} catch (IllegalArgumentException e) {
+				logger.error(String.format("Unsupported commandClass (0x%02x) encountered.", commandClassCode));
+			}
 		}
+		
+		for (ZWaveCommandClass zwaveCommandClass : this.getNode().getCommandClasses())
+			if (zwaveCommandClass.getInstances() == 0) // still waiting for an instance report of another command class. 
+				return;
+		
+		// advance node stage.
+		this.getNode().advanceNodeStage();
 	}
 	
 	/**
@@ -318,9 +301,22 @@ public class ZWaveMultiInstanceCommandClass extends ZWaveCommandClass {
 				}
 				logger.debug(String.format("Adding command class 0x%02X to the list of supported command classes.", data));
 				ZWaveCommandClass commandClass = ZWaveCommandClass.getInstance(data, this.getNode(), this.getController());
-				if (commandClass != null)
+				if (commandClass != null) 
 					endpoint.addCommandClass(commandClass);
 			}
+		}
+		
+		if (this.endpointsAreTheSameDeviceClass)
+			// advance node stage.
+			this.getNode().advanceNodeStage();
+		else {
+			for (ZWaveEndpoint ep : this.endpoints.values())
+			{
+				if (ep.getDeviceClass().getBasicDeviceClass() == Basic.NOT_KNOWN) // only advance node stage when all endpoints are known.
+					return;
+			}
+			// advance node stage.
+			this.getNode().advanceNodeStage();
 		}
 	}
 	
@@ -471,5 +467,29 @@ public class ZWaveMultiInstanceCommandClass extends ZWaveCommandClass {
 		serialMessage.setMessagePayload(newPayload);
     	return serialMessage;		
 	}
+	
+	/**
+	 * Initializes the Multi instance / endpoint command class by setting the number of instances
+	 * or getting the endpoints.
+	 */
+	public void initialize() {
+		switch (this.getVersion()) {
+			case 1:
+				// get number of instances for all command classes on this node.
+				for (ZWaveCommandClass commandClass : this.getNode().getCommandClasses()) {
+					if (commandClass.getCommandClass() == CommandClass.NO_OPERATION)
+						continue;
+					this.getController().sendData(this.getMultiInstanceGetMessage(commandClass.getCommandClass()));
+				}
+				break;
+			case 2:
+				this.getController().sendData(this.getMultiChannelEndpointGetMessage());
+				break;
+			default:
+				logger.warn(String.format("Unknown version %d for command class %s (0x%02x)", 
+						this.getVersion(), this.getCommandClass().getLabel(), this.getCommandClass().getKey()));
+				return; // don't set unknown version, revert to 1.
+		}
+	};
 	
 }

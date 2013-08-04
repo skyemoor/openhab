@@ -66,7 +66,7 @@ public class ZWaveManufacturerSpecificCommandClass extends ZWaveCommandClass {
 	public CommandClass getCommandClass() {
 		return CommandClass.MANUFACTURER_SPECIFIC;
 	}
-
+	
 	/**
 	 * {@inheritDoc}
 	 */
@@ -96,9 +96,7 @@ public class ZWaveManufacturerSpecificCommandClass extends ZWaveCommandClass {
 				logger.debug(String.format("Node %d Device Type = 0x%04x", this.getNode().getNodeId(), this.getNode().getDeviceType()));
 				logger.debug(String.format("Node %d Device ID = 0x%04x", this.getNode().getNodeId(), this.getNode().getDeviceId()));
 
-				this.getNode().setQueryStageTimeStamp(Calendar.getInstance().getTime());
-				this.getNode().setNodeStage(ZWaveNode.NodeStage.NODEBUILDINFO_DONE);
-				// TODO: Handle the rest of the zwave init stages
+				this.getNode().advanceNodeStage();
 				break;
 			default:
 			logger.warn(String.format("Unsupported Command 0x%02X for command class %s (0x%02X).", 
