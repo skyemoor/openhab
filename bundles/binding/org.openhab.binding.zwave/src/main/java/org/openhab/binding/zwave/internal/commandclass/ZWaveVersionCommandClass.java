@@ -28,17 +28,11 @@
  */
 package org.openhab.binding.zwave.internal.commandclass;
 
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
-
-import org.openhab.binding.zwave.internal.commandclass.ZWaveCommandClass.CommandClass;
 import org.openhab.binding.zwave.internal.protocol.SerialMessage;
-import org.openhab.binding.zwave.internal.protocol.ZWaveController;
-import org.openhab.binding.zwave.internal.protocol.ZWaveEvent;
-import org.openhab.binding.zwave.internal.protocol.ZWaveNode;
 import org.openhab.binding.zwave.internal.protocol.SerialMessage.SerialMessageClass;
 import org.openhab.binding.zwave.internal.protocol.SerialMessage.SerialMessageType;
-import org.openhab.binding.zwave.internal.protocol.ZWaveEvent.ZWaveEventType;
+import org.openhab.binding.zwave.internal.protocol.ZWaveController;
+import org.openhab.binding.zwave.internal.protocol.ZWaveNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -112,31 +106,40 @@ public class ZWaveVersionCommandClass extends ZWaveCommandClass {
 				int commandClassCode = serialMessage.getMessagePayload()[offset + 1] & 0xFF;
 				int commandClassVersion = serialMessage.getMessagePayload()[offset + 2] & 0xFF;
 				
-				try {
-					CommandClass commandClass = CommandClass.getCommandClass(commandClassCode);
-
-					logger.debug(String.format("Node %d Requested Command Class = %s (0x%02x)", this.getNode().getNodeId(), commandClass.getLabel() , commandClassCode));
-					logger.debug(String.format("Node %d Version = %d", this.getNode().getNodeId(), commandClassVersion));
-
-					// The version is set on the command class for this node. By updating the version, extra functionality is unlocked in the command class.
-					// The messages are backwards compatible, so it's not a problem that there is a slight delay when the command class version is queried on the
-					// node.
-					ZWaveCommandClass zwaveCommandClass = this.getNode().getCommandClass(commandClass);
-					zwaveCommandClass.setVersion(commandClassVersion);
-					
-					logger.debug(String.format("Node %d Version = %d, version set. Enabling extra functionality.", this.getNode().getNodeId(), commandClassVersion));
-					
-					for (ZWaveCommandClass zCC : this.getNode().getCommandClasses()) {
-						// wait for all nodes to get/set version information before advancing to the next stage.
-						if (zCC.getVersion() == 0)
-							return;
-					}
-					// advance node stage;
-					this.getNode().advanceNodeStage();
-					
-				} catch (IllegalArgumentException e) {
-					logger.error("Error setting version on command class 0x%02x", commandClassCode);
+				CommandClass commandClass = CommandClass.getCommandClass(commandClassCode);
+				if (commandClass == null) {
+					logger.error(String.format("Unsupported command class 0x%02x", commandClassCode));
+					return;
 				}
+
+				logger.debug(String.format("Node %d Requested Command Class = %s (0x%02x)", this.getNode().getNodeId(), commandClass.getLabel() , commandClassCode));
+				logger.debug(String.format("Node %d Version = %d", this.getNode().getNodeId(), commandClassVersion));
+
+				// The version is set on the command class for this node. By updating the version, extra functionality is unlocked in the command class.
+				// The messages are backwards compatible, so it's not a problem that there is a slight delay when the command class version is queried on the
+				// node.
+				ZWaveCommandClass zwaveCommandClass = this.getNode().getCommandClass(commandClass);
+				if (zwaveCommandClass == null) {
+					logger.error(String.format("Unsupported command class %s (0x%02x)", commandClass.getLabel(), commandClassCode));
+					return;
+				}
+				
+				if (commandClassVersion > zwaveCommandClass.getMaxVersion()) {
+					zwaveCommandClass.setVersion( zwaveCommandClass.getMaxVersion() );
+					logger.debug(String.format("Node %d Version = %d, version set to maximum supported by the binding. Enabling extra functionality.", this.getNode().getNodeId(), zwaveCommandClass.getMaxVersion()));
+				} else {
+					zwaveCommandClass.setVersion( commandClassVersion );
+					logger.debug(String.format("Node %d Version = %d, version set. Enabling extra functionality.", this.getNode().getNodeId(), commandClassVersion));
+				}
+				
+				for (ZWaveCommandClass zCC : this.getNode().getCommandClasses()) {
+					// wait for all nodes to get/set version information before advancing to the next stage.
+					if (zCC.getVersion() == 0)
+						return;
+				}
+				// advance node stage;
+				this.getNode().advanceNodeStage();
+					
 				break;
 			default:
 			logger.warn(String.format("Unsupported Command 0x%02X for command class %s (0x%02X).", 
@@ -186,15 +189,17 @@ public class ZWaveVersionCommandClass extends ZWaveCommandClass {
 	 * @param the command class to check the version for.
 	 */
 	public void checkVersion(ZWaveCommandClass commandClass) {
-		try {
-			ZWaveVersionCommandClass versionCommandClass = (ZWaveVersionCommandClass)this.getNode().getCommandClass(CommandClass.VERSION);
-			this.getController().sendData(versionCommandClass.getCommandClassVersionMessage(commandClass.getCommandClass()));
-		} catch (IllegalArgumentException e) {
+		ZWaveVersionCommandClass versionCommandClass = (ZWaveVersionCommandClass)this.getNode().getCommandClass(CommandClass.VERSION);
+		
+		if (versionCommandClass == null) {
 			logger.error(String.format("Version command class not supported on node %d," +
 					"reverting to version 1 for command class %s (0x%02x)", 
 					this.getNode().getNodeId(), 
 					commandClass.getCommandClass().getLabel(), 
 					commandClass.getCommandClass().getKey()));
+			return;
 		}
+		
+		this.getController().sendData(versionCommandClass.getCommandClassVersionMessage(commandClass.getCommandClass()));
 	};
 }

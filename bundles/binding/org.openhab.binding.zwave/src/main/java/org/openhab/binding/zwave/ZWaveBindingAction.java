@@ -31,7 +31,6 @@ package org.openhab.binding.zwave;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.openhab.binding.zwave.internal.protocol.ZWaveDeviceClass.Basic;
 import org.openhab.core.library.types.DateTimeType;
 import org.openhab.core.library.types.DecimalType;
 import org.openhab.core.library.types.OnOffType;
@@ -196,6 +195,7 @@ public enum ZWaveBindingAction {
 	
 	/**
 	 * Lookup function based on the binding action label.
+	 * Returns null if the binding action is not found.
 	 * @param label the label to lookup
 	 * @return enumeration value of the binding action.
 	 */

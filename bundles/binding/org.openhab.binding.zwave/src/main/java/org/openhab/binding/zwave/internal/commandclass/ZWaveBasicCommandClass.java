@@ -47,7 +47,7 @@ import org.slf4j.LoggerFactory;
  * @author Jan-Willem Spuij
  * @since 1.3.0
  */
-public class ZWaveBasicCommandClass extends ZWaveCommandClass {
+public class ZWaveBasicCommandClass extends ZWaveCommandClass implements ZWaveBasicCommands {
 
 	private static final Logger logger = LoggerFactory.getLogger(ZWaveBasicCommandClass.class);
 	
@@ -92,16 +92,15 @@ public class ZWaveBasicCommandClass extends ZWaveCommandClass {
 				
 				int value = serialMessage.getMessagePayload()[offset + 1] & 0xFF; 
 				logger.debug(String.format("Basic report from nodeId = %d, value = 0x%02X", this.getNode().getNodeId(), value));
-				String valueString = "";
+				Object eventValue;
 				if (value == 0) {
-					valueString = "OFF";
+					eventValue = "OFF";
 				} else if (value < 99) {
-					valueString = String.valueOf(value);
+					eventValue = value;
 				} else {
-					valueString = "ON";
+					eventValue = "ON";
 				}
-				//TODO: Handle endpoint
-				ZWaveEvent zEvent = new ZWaveEvent(ZWaveEventType.BASIC_EVENT, this.getNode().getNodeId(), endpoint, valueString);
+				ZWaveEvent zEvent = new ZWaveEvent(ZWaveEventType.BASIC_EVENT, this.getNode().getNodeId(), endpoint, eventValue);
 				this.getController().notifyEventListeners(zEvent);
 				break;
 			default:
@@ -129,6 +128,7 @@ public class ZWaveBasicCommandClass extends ZWaveCommandClass {
 	
 	/**
 	 * Gets a SerialMessage with the BASIC SET command 
+	 * @param the level to set.
 	 * @return the serial message
 	 */
 	public SerialMessage setLevelMessage(int level) {

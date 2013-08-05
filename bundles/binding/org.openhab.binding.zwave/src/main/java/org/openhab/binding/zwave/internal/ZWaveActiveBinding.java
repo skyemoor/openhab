@@ -29,13 +29,12 @@
 package org.openhab.binding.zwave.internal;
 
 import java.text.SimpleDateFormat;
-import java.util.Calendar;
 import java.util.Dictionary;
 
 import org.apache.commons.lang.StringUtils;
+import org.openhab.binding.zwave.ZWaveBindingAction;
 import org.openhab.binding.zwave.ZWaveBindingConfig;
 import org.openhab.binding.zwave.ZWaveBindingProvider;
-import org.openhab.binding.zwave.ZWaveBindingAction;
 import org.openhab.binding.zwave.internal.protocol.SerialInterface;
 import org.openhab.binding.zwave.internal.protocol.SerialInterfaceException;
 import org.openhab.binding.zwave.internal.protocol.ZWaveController;
@@ -44,8 +43,7 @@ import org.openhab.binding.zwave.internal.protocol.ZWaveEvent.ZWaveEventType;
 import org.openhab.binding.zwave.internal.protocol.ZWaveEventListener;
 import org.openhab.binding.zwave.internal.protocol.ZWaveNode;
 import org.openhab.core.binding.AbstractActiveBinding;
-import org.openhab.core.library.types.DateTimeType;
-import org.openhab.core.library.types.DecimalType;
+import org.openhab.core.library.types.IncreaseDecreaseType;
 import org.openhab.core.library.types.OnOffType;
 import org.openhab.core.library.types.PercentType;
 import org.openhab.core.library.types.StringType;
@@ -54,7 +52,6 @@ import org.openhab.core.types.State;
 import org.openhab.core.types.UnDefType;
 import org.osgi.service.cm.ConfigurationException;
 import org.osgi.service.cm.ManagedService;
-import org.osgi.service.component.ComponentContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -249,9 +246,6 @@ public class ZWaveActiveBinding extends AbstractActiveBinding<ZWaveBindingProvid
 			logger.debug("BindingProvider = {}", provider.toString());
 			logger.debug("Got nodeId = {}, endpoint = {}, action = {}", new Object[] { nodeId, endpoint, action });
 			
-			// TODO: Implement ZWaveNode NodeStage to ensure node information is complete
-			// JWS: is this necessary? isZwaveNetworkReady already ensures a complete network.
-			// I do see problems with dead or sleeping nodes though.
 			switch (action) {
 				case ZWAVE_JOIN:
 					logger.debug("Special item - zwavejoin");
@@ -270,7 +264,11 @@ public class ZWaveActiveBinding extends AbstractActiveBinding<ZWaveBindingProvid
 							this.zController.sendLevel(nodeId, endpoint, 255);
 						} else if (command == OnOffType.OFF) {
 							logger.debug("Sending OFF");
-							this.zController.sendLevel(nodeId, endpoint, 0);					
+							this.zController.sendLevel(nodeId, endpoint, 0);
+						} else if (command == IncreaseDecreaseType.INCREASE) {
+							this.zController.increaseLevel(nodeId, endpoint);
+						} else if (command == IncreaseDecreaseType.DECREASE) {
+							this.zController.decreaseLevel(nodeId, endpoint);
 						} else if (command instanceof PercentType) {
 							PercentType pt = (PercentType) command;
 							int value = pt.intValue();

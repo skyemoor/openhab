@@ -95,11 +95,9 @@ public class ZWaveGenericBindingProvider extends AbstractGenericBindingProvider 
 		ZWaveBindingAction action = ZWaveBindingAction.NONE; // default
 		
 		if(segments.length > 2) {
-			try {
-				action = ZWaveBindingAction.getZWaveBindingAction(segments[2].toUpperCase());
-			} catch(Exception e) {
+			action = ZWaveBindingAction.getZWaveBindingAction(segments[2].toUpperCase());
+			if (action == null)
 				throw new BindingConfigParseException(segments[2] + " is an unknown Z-Wave binding action.");
-			}
 		}
 		
 		ZWaveBindingConfig config = new ZWaveBindingConfig(nodeId, endpoint, action);

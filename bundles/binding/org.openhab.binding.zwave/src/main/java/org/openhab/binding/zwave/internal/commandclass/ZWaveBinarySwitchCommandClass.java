@@ -32,27 +32,34 @@ import org.openhab.binding.zwave.internal.protocol.SerialMessage;
 import org.openhab.binding.zwave.internal.protocol.SerialMessage.SerialMessageClass;
 import org.openhab.binding.zwave.internal.protocol.SerialMessage.SerialMessageType;
 import org.openhab.binding.zwave.internal.protocol.ZWaveController;
+import org.openhab.binding.zwave.internal.protocol.ZWaveEvent;
+import org.openhab.binding.zwave.internal.protocol.ZWaveEvent.ZWaveEventType;
 import org.openhab.binding.zwave.internal.protocol.ZWaveNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Handles the manufacturer specific command class. Class to request and report
- * manufacturer specific information.
+ * Handles the Binary Switch command class. Binary switches can be turned
+ * on or off and report their status as on (0xFF) or off (0x00).
+ * The commands include the possibility to set a given level, get a given
+ * level and report a level.
  * @author Jan-Willem Spuij
  * @since 1.3.0
  */
-public class ZWaveManufacturerSpecificCommandClass extends ZWaveCommandClass {
+public class ZWaveBinarySwitchCommandClass extends ZWaveCommandClass implements ZWaveBasicCommands {
 
-	private static final Logger logger = LoggerFactory.getLogger(ZWaveManufacturerSpecificCommandClass.class);
+	private static final Logger logger = LoggerFactory.getLogger(ZWaveBinarySwitchCommandClass.class);
 	
-	private static final int MANUFACTURER_SPECIFIC_GET = 0x04;
-	private static final int MANUFACTURER_SPECIFIC_REPORT = 0x05;
+	private static final int SWITCH_BINARY_SET = 0x01;
+	private static final int SWITCH_BINARY_GET = 0x02;
+	private static final int SWITCH_BINARY_REPORT = 0x03;
 	
 	/**
-	 * Creates a new instance of the ZwaveManufacturerSpecificCommandClass class.
+	 * Creates a new instance of the ZWaveBinarySwitchCommandClass class.
+	 * @param node the node this command class belongs to
+	 * @param controller the controller to use
 	 */
-	public ZWaveManufacturerSpecificCommandClass(ZWaveNode node,
+	public ZWaveBinarySwitchCommandClass(ZWaveNode node,
 			ZWaveController controller) {
 		super(node, controller);
 	}
@@ -62,39 +69,36 @@ public class ZWaveManufacturerSpecificCommandClass extends ZWaveCommandClass {
 	 */
 	@Override
 	public CommandClass getCommandClass() {
-		return CommandClass.MANUFACTURER_SPECIFIC;
+		return CommandClass.SWITCH_BINARY;
 	}
-	
+
 	/**
 	 * {@inheritDoc}
 	 */
 	@Override
 	public void handleApplicationCommandRequest(SerialMessage serialMessage,
 			int offset, int endpoint) {
-
-		logger.debug("Handle Message Manufacture Specific Request");
-		logger.debug(String.format("Received Manufacture Specific Information for Node ID = %d", this.getNode().getNodeId()));
+		logger.debug("Handle Message Switch Binary Request");
+		logger.debug(String.format("Received Switch Binary Request for Node ID = %d", this.getNode().getNodeId()));
 		int command = serialMessage.getMessagePayload()[offset] & 0xFF;
 		switch (command) {
-			case MANUFACTURER_SPECIFIC_GET:
+			case SWITCH_BINARY_SET:
+			case SWITCH_BINARY_GET:
 				logger.warn(String.format("Command 0x%02X not implemented.", command));
 				return;
-			case MANUFACTURER_SPECIFIC_REPORT:
-				logger.debug("Process Manufacturer Specific Report");
+			case SWITCH_BINARY_REPORT:
+				logger.debug("Process Switch Binary Report");
 				
-				int tempMan = ((serialMessage.getMessagePayload()[offset + 1] & 0xFF) << 8) | (serialMessage.getMessagePayload()[offset + 2] & 0xFF);
-				int tempDeviceType = ((serialMessage.getMessagePayload()[offset + 3] & 0xFF) << 8) | (serialMessage.getMessagePayload()[offset + 4] & 0xFF);
-				int tempDeviceId = ((serialMessage.getMessagePayload()[offset + 5] & 0xFF) << 8) | (serialMessage.getMessagePayload()[offset + 6] & 0xFF);
-				
-				this.getNode().setManufacturer(tempMan);
-				this.getNode().setDeviceType(tempDeviceType);
-				this.getNode().setDeviceId(tempDeviceId);
-				
-				logger.debug(String.format("Node %d Manufacturer ID = 0x%04x", this.getNode().getNodeId(), this.getNode().getManufacturer()));
-				logger.debug(String.format("Node %d Device Type = 0x%04x", this.getNode().getNodeId(), this.getNode().getDeviceType()));
-				logger.debug(String.format("Node %d Device ID = 0x%04x", this.getNode().getNodeId(), this.getNode().getDeviceId()));
-
-				this.getNode().advanceNodeStage();
+				int value = serialMessage.getMessagePayload()[offset + 1] & 0xFF; 
+				logger.debug(String.format("Switch Binary report from nodeId = %d, value = 0x%02X", this.getNode().getNodeId(), value));
+				Object eventValue;
+				if (value == 0) {
+					eventValue = "OFF";
+				} else {
+					eventValue = "ON";
+				}
+				ZWaveEvent zEvent = new ZWaveEvent(ZWaveEventType.SWITCH_EVENT, this.getNode().getNodeId(), endpoint, eventValue);
+				this.getController().notifyEventListeners(zEvent);
 				break;
 			default:
 			logger.warn(String.format("Unsupported Command 0x%02X for command class %s (0x%02X).", 
@@ -102,22 +106,38 @@ public class ZWaveManufacturerSpecificCommandClass extends ZWaveCommandClass {
 					this.getCommandClass().getLabel(),
 					this.getCommandClass().getKey()));
 		}
-		//checkNodesInitComplete();
 	}
 
 	/**
-	 * Gets a SerialMessage with the ManufacturerSpecific GET command 
+	 * Gets a SerialMessage with the SWITCH_BINARY_GET command 
 	 * @return the serial message
 	 */
-	public SerialMessage getManufacturerSpecificMessage() {
-		logger.debug("Creating new message for application command MANUFACTURER_SPECIFIC_GET for node {}", this.getNode().getNodeId());
+	public SerialMessage getLevelMessage() {
+		logger.debug("Creating new message for application command SWITCH_BINARY_GET for node {}", this.getNode().getNodeId());
 		SerialMessage result = new SerialMessage(SerialMessageClass.SendData, SerialMessageType.Request);
     	byte[] newPayload = { 	(byte) this.getNode().getNodeId(), 
     							2, 
 								(byte) getCommandClass().getKey(), 
-								(byte) MANUFACTURER_SPECIFIC_GET };
+								(byte) SWITCH_BINARY_GET };
     	result.setMessagePayload(newPayload);
     	return result;		
 	}
-
+	
+	/**
+	 * Gets a SerialMessage with the SWITCH_BINARY_SET command 
+	 * @param the level to set. 0 is mapped to off, > 0 is mapped to on.
+	 * @return the serial message
+	 */
+	public SerialMessage setLevelMessage(int level) {
+		logger.debug("Creating new message for application command SWITCH_BINARY_SET for node {}", this.getNode().getNodeId());
+		SerialMessage result = new SerialMessage(SerialMessageClass.SendData, SerialMessageType.Request);
+    	byte[] newPayload = { 	(byte) this.getNode().getNodeId(), 
+    							3, 
+								(byte) getCommandClass().getKey(), 
+								(byte) SWITCH_BINARY_SET,
+								(byte) (level > 0 ? 0xFF : 0x00)
+								};
+    	result.setMessagePayload(newPayload);
+    	return result;		
+	}
 }

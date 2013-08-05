@@ -37,11 +37,11 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang.ArrayUtils;
-import org.openhab.binding.zwave.internal.commandclass.ZWaveBasicCommandClass;
+import org.openhab.binding.zwave.internal.commandclass.ZWaveBasicCommands;
 import org.openhab.binding.zwave.internal.commandclass.ZWaveCommandClass;
-import org.openhab.binding.zwave.internal.commandclass.ZWaveMultiInstanceCommandClass;
 import org.openhab.binding.zwave.internal.commandclass.ZWaveCommandClass.CommandClass;
-import org.openhab.binding.zwave.internal.commandclass.ZWaveManufacturerSpecificCommandClass;
+import org.openhab.binding.zwave.internal.commandclass.ZWaveMultiInstanceCommandClass;
+import org.openhab.binding.zwave.internal.commandclass.ZWaveMultiLevelSwitchCommandClass;
 import org.openhab.binding.zwave.internal.protocol.SerialMessage.SerialMessageClass;
 import org.openhab.binding.zwave.internal.protocol.SerialMessage.SerialMessageType;
 import org.openhab.binding.zwave.internal.protocol.ZWaveDeviceClass.Basic;
@@ -68,10 +68,10 @@ public class ZWaveController implements SerialInterfaceEventListener {
 	private static final int NODE_BYTES = 29; // 29 bytes = 232 bits, one for each supported node by Z-Wave;
 	
 	private static final int TRANSMIT_OPTION_ACK = 0x01;
-	private static final int TRANSMIT_OPTION_LOW_POWER = 0x02;
+	// private static final int TRANSMIT_OPTION_LOW_POWER = 0x02;
 	private static final int TRANSMIT_OPTION_AUTO_ROUTE = 0x04;
-	private static final int TRANSMIT_OPTION_NO_ROUTE = 0x10;
-	private static final int TRANSMIT_OPTION_EXPLORE = 0x20;
+	// private static final int TRANSMIT_OPTION_NO_ROUTE = 0x10;
+	// private static final int TRANSMIT_OPTION_EXPLORE = 0x20;
 
 	private final SerialInterface serialInterface;
 	private final Map<Integer, ZWaveNode> zwaveNodes = new HashMap<Integer, ZWaveNode>();
@@ -210,23 +210,26 @@ public class ZWaveController implements SerialInterfaceEventListener {
 		logger.debug("Handle Message Application Command Request");
 		int nodeId = incomingMessage.getMessagePayload()[1] & 0xFF;
 		logger.debug("Application Command Request from Node " + nodeId);
-		try {
-			ZWaveNode node = getNode(nodeId);
-			
-			CommandClass commandClass = CommandClass.getCommandClass(incomingMessage.getMessagePayload()[3] & 0xFF);
-			logger.debug("Incoming command class %s (0x%02x)", commandClass.getLabel(), commandClass.getKey());
-			
-			ZWaveCommandClass zwaveCommandClass =  node.getCommandClass(commandClass);
-			
-			// We got an unsupported command class, return.
-			if (zwaveCommandClass == null)
-				return;
-	
-			logger.debug("Found Command Class {}, passing to handleApplicationCommandRequest", zwaveCommandClass.getCommandClass().getLabel());
-			zwaveCommandClass.handleApplicationCommandRequest(incomingMessage, 4, 1);
-		} catch (IllegalArgumentException e) {
-			logger.error(e.getLocalizedMessage());
+		ZWaveNode node = getNode(nodeId);
+		int commandClassCode = incomingMessage.getMessagePayload()[3] & 0xFF;
+		CommandClass commandClass = CommandClass.getCommandClass(commandClassCode);
+
+		if (commandClass == null) {
+			logger.error(String.format("Unsupported command class 0x%02x", commandClassCode));
+			return;
 		}
+		
+		logger.debug("Incoming command class %s (0x%02x)", commandClass.getLabel(), commandClass.getKey());
+		ZWaveCommandClass zwaveCommandClass =  node.getCommandClass(commandClass);
+		
+		// We got an unsupported command class, return.
+		if (zwaveCommandClass == null) {
+			logger.error(String.format("Unsupported command class %s (0x%02x)", commandClass.getLabel(), commandClassCode));
+			return;
+		}
+		
+		logger.debug("Found Command Class {}, passing to handleApplicationCommandRequest", zwaveCommandClass.getCommandClass().getLabel());
+		zwaveCommandClass.handleApplicationCommandRequest(incomingMessage, 4, 1);
 	}
 	
 	/**
@@ -236,14 +239,13 @@ public class ZWaveController implements SerialInterfaceEventListener {
 	 */
 	private void handleApplicationUpdateRequest(SerialMessage incomingMessage) {
 		logger.debug("Handle Message Application Update Request");
-		
 		int nodeId = incomingMessage.getMessagePayload()[1] & 0xFF;
+		
 		//TODO: Z-Wave devices with a remote control do not report this update. Figure out how to handle.
 		logger.debug("Application Update Request from Node " + nodeId);
-		
 		UpdateState updateState = UpdateState.getUpdateState(incomingMessage.getMessagePayload()[0] & 0xFF);
 		
-		switch (updateState){
+		switch (updateState) {
 		case NODE_INFO_RECEIVED:
 			logger.debug("Application update request, node information received.");			
 			int length = incomingMessage.getMessagePayload()[2] & 0xFF;
@@ -262,7 +264,6 @@ public class ZWaveController implements SerialInterfaceEventListener {
 			
 			// advance node stage.
 			node.advanceNodeStage();
-			
 			break;
 //		case NODE_INFO_REQ_DONE:
 //			logger.debug("Application update request, need to handle Node Info Request Done.");
@@ -464,8 +465,20 @@ public class ZWaveController implements SerialInterfaceEventListener {
 		this.zwaveNodes.get(nodeId).setVersion(version);
 
 		Basic basic = Basic.getBasic(incomingMessage.getMessagePayload()[3] & 0xFF);
+		if (basic == null) {
+			String.format("Basic device class 0x%02x not found", incomingMessage.getMessagePayload()[3] & 0xFF);
+			return;
+		}
 		Generic generic = Generic.getGeneric(incomingMessage.getMessagePayload()[4] & 0xFF);
+		if (generic == null) {
+			String.format("Generic device class 0x%02x not found", incomingMessage.getMessagePayload()[4] & 0xFF);
+			return;
+		}
 		Specific specific = Specific.getSpecific(generic, incomingMessage.getMessagePayload()[5] & 0xFF);
+		if (specific == null) {
+			String.format("Specific device class 0x%02x not found", incomingMessage.getMessagePayload()[5] & 0xFF);
+			return;
+		}
 		logger.debug(String.format("Basic = %s 0x%02x", basic.getLabel(), basic.getKey()));
 		logger.debug(String.format("Generic = %s 0x%02x", generic.getLabel(), generic.getKey()));
 		logger.debug(String.format("Specific = %s 0x%02x", specific.getLabel(), specific.getKey()));
@@ -645,12 +658,16 @@ public class ZWaveController implements SerialInterfaceEventListener {
 	 */
 	public void requestLevel(int nodeId, int endpoint) {
 		ZWaveNode node = this.getNode(nodeId);
+		ZWaveBasicCommands zwaveCommandClass = null;
 		SerialMessage serialMessage = null;
-		ZWaveBasicCommandClass zwaveCommandClass;
 		
-		try {
-			zwaveCommandClass = (ZWaveBasicCommandClass)node.resolveCommandClass(CommandClass.BASIC, 1);
-		} catch (IllegalArgumentException e){
+		for (CommandClass commandClass : new CommandClass[] { CommandClass.SWITCH_MULTILEVEL, CommandClass.SWITCH_BINARY, CommandClass.BASIC }) {
+			zwaveCommandClass = (ZWaveBasicCommands)node.resolveCommandClass(commandClass, endpoint);
+			if (zwaveCommandClass != null)
+				break;
+		}
+		
+		if (zwaveCommandClass == null) {
 			logger.error("No Command Class found on node {}, instance/endpoint {} to request level.", nodeId, endpoint);
 			return;
 		}
@@ -675,8 +692,9 @@ public class ZWaveController implements SerialInterfaceEventListener {
 		
 		logger.debug("Encapsulating message for node {}, instance / endpoint {}", node.getNodeId(), endpointId);
 		
-		try {
-			multiInstanceCommandClass = (ZWaveMultiInstanceCommandClass)node.getCommandClass(CommandClass.MULTI_INSTANCE);
+		multiInstanceCommandClass = (ZWaveMultiInstanceCommandClass)node.getCommandClass(CommandClass.MULTI_INSTANCE);
+		
+		if (multiInstanceCommandClass != null) {
 			logger.debug("Encapsulating message for node {}, instance / endpoint {}", node.getNodeId(), endpointId);
 			switch (multiInstanceCommandClass.getVersion()) {
 				case 2:
@@ -688,11 +706,9 @@ public class ZWaveController implements SerialInterfaceEventListener {
 					serialMessage = multiInstanceCommandClass.getMultiInstanceEncapMessage(serialMessage, endpointId);
 					return serialMessage;
 			}
-		} catch (IllegalArgumentException e) {
 		}
 
-		if (endpointId != 1)
-		{
+		if (endpointId != 1) {
 			logger.warn("Encapsulating message for node {}, instance / endpoint {} failed, will discard message.", node.getNodeId(), endpointId);
 			return null;
 		}
@@ -700,7 +716,62 @@ public class ZWaveController implements SerialInterfaceEventListener {
 		return serialMessage;
 	}
 	
-	
+	/**
+	 * increase level on the node / endpoint. The level is
+	 * increased. Only dimmers support this. 
+	 * @param nodeId the node id to increase the level for.
+	 * @param endpoint the endpoint to increase the level for.
+	 */
+	public void increaseLevel(int nodeId, int endpoint) {
+		ZWaveNode node = this.getNode(nodeId);
+		SerialMessage serialMessage = null;
+		
+		ZWaveMultiLevelSwitchCommandClass zwaveCommandClass = (ZWaveMultiLevelSwitchCommandClass)node.resolveCommandClass(CommandClass.SWITCH_MULTILEVEL, endpoint);
+		
+		if (zwaveCommandClass == null) {
+			logger.error("No Command Class found on node {}, instance/endpoint {} to request level.", nodeId, endpoint);
+			return;
+		}
+			 
+		serialMessage = encapsulate(zwaveCommandClass.increaseLevelMessage(), node, endpoint);
+		
+		if (serialMessage != null)
+		{
+			this.sendData(serialMessage);
+			ZWaveEvent zEvent = new ZWaveEvent(ZWaveEventType.DIMMER_EVENT, nodeId, endpoint, zwaveCommandClass.getLevel());
+			this.notifyEventListeners(zEvent);
+		}
+		
+	}
+
+	/**
+	 * decrease level on the node / endpoint. The level is
+	 * decreased. Only dimmers support this. 
+	 * @param nodeId the node id to decrease the level for.
+	 * @param endpoint the endpoint to decrease the level for.
+	 */
+	public void decreaseLevel(int nodeId, int endpoint) {
+		ZWaveNode node = this.getNode(nodeId);
+		SerialMessage serialMessage = null;
+		
+		ZWaveMultiLevelSwitchCommandClass zwaveCommandClass = (ZWaveMultiLevelSwitchCommandClass)node.resolveCommandClass(CommandClass.SWITCH_MULTILEVEL, endpoint);
+		
+		if (zwaveCommandClass == null) {
+			logger.error("No Command Class found on node {}, instance/endpoint {} to request level.", nodeId, endpoint);
+			return;
+		}
+			 
+		serialMessage = encapsulate(zwaveCommandClass.decreaseLevelMessage(), node, endpoint);
+		
+		if (serialMessage != null)
+		{
+			this.sendData(serialMessage);
+			ZWaveEvent zEvent = new ZWaveEvent(ZWaveEventType.DIMMER_EVENT, nodeId, endpoint, zwaveCommandClass.getLevel());
+			this.notifyEventListeners(zEvent);
+		}
+
+	}
+
 	/**
 	 * Transmits the SerialMessage to a single Z-Wave Node or all Z-Wave Nodes (broadcast).
 	 * Sets the transmission options as well.
@@ -739,13 +810,17 @@ public class ZWaveController implements SerialInterfaceEventListener {
 	 */
 	public void sendLevel(int nodeId, int endpoint, int level) {
 		ZWaveNode node = this.getNode(nodeId);
+		ZWaveBasicCommands zwaveCommandClass = null;
 		SerialMessage serialMessage = null;
-		ZWaveBasicCommandClass zwaveCommandClass;
 		
-		try {
-			zwaveCommandClass = (ZWaveBasicCommandClass)node.resolveCommandClass(CommandClass.BASIC, 1);
-		} catch (IllegalArgumentException e){
-			logger.error("No Command Class found on node {}, instance/endpoint {} to send level.", nodeId, endpoint);
+		for (CommandClass commandClass : new CommandClass[] { CommandClass.SWITCH_MULTILEVEL, CommandClass.SWITCH_BINARY, CommandClass.BASIC }) {
+			zwaveCommandClass = (ZWaveBasicCommands)node.resolveCommandClass(commandClass, endpoint);
+			if (zwaveCommandClass != null)
+				break;
+		}
+		
+		if (zwaveCommandClass == null) {
+			logger.error("No Command Class found on node {}, instance/endpoint {} to request level.", nodeId, endpoint);
 			return;
 		}
 			 
@@ -837,15 +912,11 @@ public class ZWaveController implements SerialInterfaceEventListener {
 
 	/**
 	 * Gets the node object using it's node ID as key.
+	 * Returns null if the node is not found
 	 * @param nodeId the Node ID of the node to get.
 	 * @return node object
-	 * @throws IllegalArgumentException thrown when the nodeId is not found.
 	 */
-	public ZWaveNode getNode(int nodeId) throws IllegalArgumentException{
-		
-		if (!this.zwaveNodes.containsKey(nodeId))
-			throw new IllegalArgumentException(String.format("Node with nodeId {} not found.", nodeId)); 
-		
+	public ZWaveNode getNode(int nodeId) {
 		return this.zwaveNodes.get(nodeId);
 	}
 	
@@ -895,17 +966,14 @@ public class ZWaveController implements SerialInterfaceEventListener {
 
 		/**
 		 * Lookup function based on the update state code.
+		 * Returns null when there is no update state with code i.
 		 * @param i the code to lookup
 		 * @return enumeration value of the update state.
-		 * @exception IllegalArgumentException thrown when there is no update state with code i
 		 */
-		public static UpdateState getUpdateState(int i) throws IllegalArgumentException {
+		public static UpdateState getUpdateState(int i) {
 			if (codeToUpdateStateMapping == null) {
 				initMapping();
 			}
-			
-			if (!codeToUpdateStateMapping.containsKey(i))
-				throw new IllegalArgumentException(String.format("Update State 0x%02x not found", i));
 			
 			return codeToUpdateStateMapping.get(i);
 		}

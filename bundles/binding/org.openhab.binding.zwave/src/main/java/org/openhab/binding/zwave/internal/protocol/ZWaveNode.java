@@ -315,15 +315,12 @@ public class ZWaveNode {
 	
 	/**
 	 * Returns a commandClass object this node implements.
+	 * Returns null if command class is not supported by this node.
 	 * @param commandClass The command class to get.
 	 * @return the command class.
-	 * @throws IllegalArgumentException thrown when this node does not support this command class.
 	 */
-	public ZWaveCommandClass getCommandClass(CommandClass commandClass) throws IllegalArgumentException
+	public ZWaveCommandClass getCommandClass(CommandClass commandClass)
 	{
-		if (!supportedCommandClasses.containsKey(commandClass))
-			throw new IllegalArgumentException(String.format("Command class not supported by node %d", getNodeId()));
-		
 		return supportedCommandClasses.get(commandClass);
 	}
 	
@@ -349,23 +346,20 @@ public class ZWaveNode {
 	 * If endpoint != 1 and version of the multi instance command == 2 then
 	 * first try command classes of endpoints. If not found the return a  
 	 * supported command class on the node itself.
+	 * Returns null if a command class is not found.
 	 * @param commandClass The command class to resolve.
 	 * @param endpointId the endpoint / instance to resolve this command class for.
 	 * @return the command class.
-	 * @throws IllegalArgumentException thrown when this node does not support this command class.
 	 */
-	public ZWaveCommandClass resolveCommandClass(CommandClass commandClass, int endpointId) throws IllegalArgumentException
+	public ZWaveCommandClass resolveCommandClass(CommandClass commandClass, int endpointId)
 	{
 		ZWaveMultiInstanceCommandClass multiInstanceCommandClass = (ZWaveMultiInstanceCommandClass)supportedCommandClasses.get(CommandClass.MULTI_INSTANCE);
 		
 		if (multiInstanceCommandClass != null && multiInstanceCommandClass.getVersion() == 2) {
-			try {
-				ZWaveEndpoint endpoint = multiInstanceCommandClass.getEndpoint(endpointId);
-				ZWaveCommandClass result = endpoint.getCommandClass(commandClass);
-				if (result != null)
-					return result;
-			} catch (IllegalArgumentException e) {
-			}
+			ZWaveEndpoint endpoint = multiInstanceCommandClass.getEndpoint(endpointId);
+			ZWaveCommandClass result = endpoint.getCommandClass(commandClass);
+			if (result != null)
+				return result;
 		}
 		
 		return getCommandClass(commandClass);
@@ -402,52 +396,48 @@ public class ZWaveNode {
 				break;
 			case NODEBUILDINFO_DETAILS:
 				// try and get the manufacturerSpecific command class.
-				try {
-					ZWaveManufacturerSpecificCommandClass manufacturerSpecific = (ZWaveManufacturerSpecificCommandClass)this.getCommandClass(CommandClass.MANUFACTURER_SPECIFIC);
-					
+				ZWaveManufacturerSpecificCommandClass manufacturerSpecific = (ZWaveManufacturerSpecificCommandClass)this.getCommandClass(CommandClass.MANUFACTURER_SPECIFIC);
+				
+				if (manufacturerSpecific != null) {
 					// if this node implements the Manufacturer Specific command class, we use it to get manufacturer info.
 					this.setNodeStage(ZWaveNode.NodeStage.NODEBUILDINFO_MANSPEC01);
 					this.controller.sendData(manufacturerSpecific.getManufacturerSpecificMessage());
 					break;
-				} catch (IllegalArgumentException ex) {
-					logger.warn("Node {} does not support MANUFACTURER_SPECIFIC, proceeding to version node stage.", this.getNodeId());
 				}
+				
+				logger.warn("Node {} does not support MANUFACTURER_SPECIFIC, proceeding to version node stage.", this.getNodeId());
 			case NODEBUILDINFO_MANSPEC01:
 				this.setNodeStage(ZWaveNode.NodeStage.NODEBUILDINFO_VERSION); // nothing more to do for this node.
 				// try and get the version command class.
-				try {
-					ZWaveVersionCommandClass version = (ZWaveVersionCommandClass)this.getCommandClass(CommandClass.VERSION);
-					boolean checkVersionCalled = false;
-					for (ZWaveCommandClass zwaveCommandClass : this.getCommandClasses()) {
-						if (version != null && zwaveCommandClass.getMaxVersion() > 1) {
-							version.checkVersion(zwaveCommandClass); // check version for this command class.
-							checkVersionCalled = true;				
-						} else
-							zwaveCommandClass.setVersion(1);  
-					}
-					
-					if (checkVersionCalled) // wait for another call of advanceNodeStage before continuing.
-						break;
-				} catch (IllegalArgumentException ex) {
-					logger.warn("Node {} does not support VERSION, proceeding to instances node stage.", this.getNodeId());
-					for (ZWaveCommandClass zwaveCommandClass : this.getCommandClasses()) {
-						zwaveCommandClass.setVersion(1);
-					}
+				ZWaveVersionCommandClass version = (ZWaveVersionCommandClass)this.getCommandClass(CommandClass.VERSION);
+				
+				boolean checkVersionCalled = false;
+				for (ZWaveCommandClass zwaveCommandClass : this.getCommandClasses()) {
+					if (version != null && zwaveCommandClass.getMaxVersion() > 1) {
+						version.checkVersion(zwaveCommandClass); // check version for this command class.
+						checkVersionCalled = true;				
+					} else
+						zwaveCommandClass.setVersion(1);  
 				}
+				
+				if (checkVersionCalled) // wait for another call of advanceNodeStage before continuing.
+					break;
 			case NODEBUILDINFO_VERSION:
 				this.setNodeStage(ZWaveNode.NodeStage.NODEBUILDINFO_INSTANCES); // nothing more to do for this node.
-				try {
-					// try and get the multi instance / channel command class.
-					ZWaveMultiInstanceCommandClass multiInstance = (ZWaveMultiInstanceCommandClass)this.getCommandClass(CommandClass.MULTI_INSTANCE);
-
+				// try and get the multi instance / channel command class.
+				ZWaveMultiInstanceCommandClass multiInstance = (ZWaveMultiInstanceCommandClass)this.getCommandClass(CommandClass.MULTI_INSTANCE);
+				
+				if (multiInstance != null) {
 					multiInstance.initialize();
 					break;
-				} catch (IllegalArgumentException ex) {
-					logger.warn("Node {} does not support MULTI_INSTANCE, proceeding to done node stage.", this.getNodeId());
-				}
+				} 
+					
+				logger.warn("Node {} does not support MULTI_INSTANCE, proceeding to done node stage.", this.getNodeId());
 			case NODEBUILDINFO_INSTANCES:
 				this.setNodeStage(ZWaveNode.NodeStage.NODEBUILDINFO_DONE);
-				
+				break;
+			default:
+				logger.error("Unknown node state {} encountered on Node {}", this.nodeStage.getLabel(), this.getNodeId());
 		}
 	}
 	

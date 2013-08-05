@@ -140,6 +140,7 @@ public abstract class ZWaveCommandClass {
 
 	/**
 	 * Gets an instance of the right command class.
+	 * Returns null if the command class is not found.
 	 * @param i the code to instantiate
 	 * @return the ZWaveCommandClass instance that was instantiated, null otherwise 
 	 */
@@ -147,10 +148,14 @@ public abstract class ZWaveCommandClass {
 		logger.debug(String.format("Creating new instance of command class 0x%02X", i));
 		try {
 			CommandClass commandClass = CommandClass.getCommandClass(i);
+			if (commandClass == null) {
+				logger.warn(String.format("Unsupported command class 0x%02x", i));
+				return null;
+			}
 			Class<? extends ZWaveCommandClass> commandClassClass = commandClass.getCommandClassClass();
 			
 			if (commandClassClass == null) {
-				logger.warn("Unsupported command class {}", commandClass.getLabel());
+				logger.warn(String.format("Unsupported command class %s (0x%02x)", commandClass.getLabel(), i));
 				return null;
 			}
 				
@@ -181,8 +186,8 @@ public abstract class ZWaveCommandClass {
 		APPLICATION_STATUS(0x22,"APPLICATION_STATUS",null),
 		ZIP_SERVICES(0x23,"ZIP_SERVICES",null),
 		ZIP_SERVER(0x24,"ZIP_SERVER",null),
-		SWITCH_BINARY(0x25,"SWITCH_BINARY",null),
-		SWITCH_MULTILEVEL(0x26,"SWITCH_MULTILEVEL",null),
+		SWITCH_BINARY(0x25,"SWITCH_BINARY",ZWaveBinarySwitchCommandClass.class),
+		SWITCH_MULTILEVEL(0x26,"SWITCH_MULTILEVEL",ZWaveMultiLevelSwitchCommandClass.class),
 		SWITCH_ALL(0x27,"SWITCH_ALL",null),
 		SWITCH_TOGGLE_BINARY(0x28,"SWITCH_TOGGLE_BINARY",null),
 		SWITCH_TOGGLE_MULTILEVEL(0x29,"SWITCH_TOGGLE_MULTILEVEL",null),
@@ -286,17 +291,14 @@ public abstract class ZWaveCommandClass {
 
 		/**
 		 * Lookup function based on the command class code.
+		 * Returns null if there is no command class with code i
 		 * @param i the code to lookup
 		 * @return enumeration value of the command class.
-		 * @exception IllegalArgumentException thrown when there is no command class with code i
 		 */
-		public static CommandClass getCommandClass(int i) throws IllegalArgumentException {
+		public static CommandClass getCommandClass(int i) {
 			if (codeToCommandClassMapping == null) {
 				initMapping();
 			}
-			
-			if (!codeToCommandClassMapping.containsKey(i))
-				throw new IllegalArgumentException(String.format("Command Class 0x%02x not found", i));
 			
 			return codeToCommandClassMapping.get(i);
 		}

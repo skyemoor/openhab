@@ -156,17 +156,14 @@ public class ZWaveDeviceClass {
 
 		/**
 		 * Lookup function based on the basic device class code.
+		 * Returns null if the code does not exist.
 		 * @param i the code to lookup
 		 * @return enumeration value of the basic device class.
-		 * @exception IllegalArgumentException thrown when there is no basic device class with code i
 		 */
-		public static Basic getBasic(int i) throws IllegalArgumentException {
+		public static Basic getBasic(int i) {
 			if (codeToBasicMapping == null) {
 				initMapping();
 			}
-			
-			if (!codeToBasicMapping.containsKey(i))
-				throw new IllegalArgumentException(String.format("Basic device class 0x%02x not found", i));
 			
 			return codeToBasicMapping.get(i);
 		}
@@ -243,17 +240,14 @@ public class ZWaveDeviceClass {
 
 		/**
 		 * Lookup function based on the generic device class code.
+		 * Returns null if the code does not exist.
 		 * @param i the code to lookup
 		 * @return enumeration value of the generic device class.
-		 * @exception IllegalArgumentException thrown when there is no generic device class with code i
 		 */
-		public static Generic getGeneric(int i) throws IllegalArgumentException {
+		public static Generic getGeneric(int i) {
 			if (codeToGenericMapping == null) {
 				initMapping();
 			}
-			
-			if (!codeToGenericMapping.containsKey(i))
-				throw new IllegalArgumentException(String.format("Generic device class 0x%02x not found", i));
 			
 			return codeToGenericMapping.get(i);
 		}
@@ -374,13 +368,12 @@ public class ZWaveDeviceClass {
 
 	    /**
 	     * Lookup function based on the generic device class and the specific device class code.
+		 * Returns null if the code does not exist.
 	     * @param genericDeviceClass the generic device class
 	     * @param i the specific device class code
 	     * @return the Specific enumeration
-		 * @exception IllegalArgumentException thrown when there is no specific device class with code i for
-		 * that generic device class.
 	     */
-		public static Specific getSpecific(Generic genericDeviceClass, int i) throws IllegalArgumentException {
+		public static Specific getSpecific(Generic genericDeviceClass, int i) {
 	        if (codeToSpecificMapping == null) {
 	            initMapping();
 	        }
@@ -389,10 +382,9 @@ public class ZWaveDeviceClass {
 	        if (i == 0)
 	        	return codeToSpecificMapping.get(Generic.NOT_KNOWN).get(i);
 	        
-	        if (!codeToSpecificMapping.containsKey(genericDeviceClass) || !codeToSpecificMapping.get(genericDeviceClass).containsKey(i))
-				throw new IllegalArgumentException(String.format("Specific device class 0x%02x not found", i));
-			
-	        
+	        if (!codeToSpecificMapping.containsKey(genericDeviceClass))
+				return null;
+
 	        return codeToSpecificMapping.get(genericDeviceClass).get(i);
 		}
 
