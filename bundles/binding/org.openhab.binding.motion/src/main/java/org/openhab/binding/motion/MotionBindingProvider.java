@@ -21,5 +21,5 @@ import org.openhab.core.binding.BindingProvider;
  * @since 1.5.0
  */
 public interface MotionBindingProvider extends BindingProvider {
-	MotionBindingConfig getItemConfig(String itemName);
+	MotionBindingConfig getBindingConfig(String itemName);
 }

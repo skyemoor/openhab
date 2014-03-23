@@ -1,5 +1,6 @@
 package org.openhab.binding.motion.internal;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
@@ -17,10 +18,16 @@ public class Camera {
 	private final String cameraId;
 	private final EventPublisher eventPublisher;
 	
+	private String url;
+	private String encoding;
+	private File mask;
+	private int sensitivity = 0;
+		
 	private final List<String> itemNames = 
 			Collections.synchronizedList(new ArrayList<String>());
 	
-	private String url;
+	private volatile boolean motionDetectEnabled;
+	private volatile boolean maskEnabled;
 	
 	private MonitorThread monitorThread;
 	
@@ -41,6 +48,31 @@ public class Camera {
 		this.url = url;
 	}
 	
+	
+	public String getEncoding() {
+		return encoding;
+	}
+
+	public void setEncoding(String encoding) {
+		this.encoding = encoding;
+	}
+
+	public File getMask() {
+		return mask;
+	}
+
+	public void setMask(File mask) {
+		this.mask = mask;
+	}
+
+	public int getSensitivity() {
+		return sensitivity;
+	}
+
+	public void setSensitivity(int sensitivity) {
+		this.sensitivity = sensitivity;
+	}
+
 	private List<String> getItemNames() {
 		return new ArrayList<String>(itemNames);
 	}
@@ -48,6 +80,25 @@ public class Camera {
 	public void registerItemName(String itemName) {
 		if (!itemNames.contains(itemName))
 			itemNames.add(itemName);
+	}
+	
+	public boolean getMotionDetectEnabled() {
+		return motionDetectEnabled;
+	}
+	
+	public void setMotionDetectEnabled(boolean enabled) {
+		// TODO: need to set the appropriate variable in the detection library
+		// TODO: disabling motion detection should send a motionCeased event to ensure any 'motion' items are cleared
+		motionDetectEnabled = enabled;
+	}
+	
+	public boolean getMaskEnabled() {
+		return maskEnabled;
+	}
+	
+	public void setMaskEnabled(boolean enabled) {
+		// TODO: need to set the appropriate variable in the detection library
+		maskEnabled = enabled;
 	}
 	
 	public void start() {
@@ -72,10 +123,13 @@ public class Camera {
 			while (!isInterrupted()) {
 				try {
 					// CRIT: testing code - switch motion detection on/off every 5sec
-					Thread.sleep(5000);
-					motionDetected(new MotionEvent(this, true, 1, Calendar.getInstance(), cameraId, null, null));
-					Thread.sleep(5000);
-					motionCeased(new MotionEvent(this, false, 1, Calendar.getInstance(), cameraId, null, null));
+					if (getMotionDetectEnabled()) {
+						logger.debug("Motion detection enabled with mask=" + getMaskEnabled());
+						Thread.sleep(5000);
+						motionDetected(new MotionEvent(this, true, 1, Calendar.getInstance(), cameraId, null, null));
+						Thread.sleep(5000);
+						motionCeased(new MotionEvent(this, false, 1, Calendar.getInstance(), cameraId, null, null));
+					}
 				} catch (Exception e) {
 					logger.error("Error monitoring camera feed", e);
 				}

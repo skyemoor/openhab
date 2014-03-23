@@ -8,6 +8,7 @@
  */
 package org.openhab.binding.motion.internal;
 
+import java.io.File;
 import java.util.Dictionary;
 import java.util.Enumeration;
 import java.util.Map;
@@ -15,10 +16,13 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.commons.lang.StringUtils;
 import org.openhab.binding.motion.MotionBindingConfig;
 import org.openhab.binding.motion.MotionBindingProvider;
 import org.openhab.core.binding.AbstractBinding;
 import org.openhab.core.binding.BindingProvider;
+import org.openhab.core.library.types.OnOffType;
+import org.openhab.core.types.Command;
 import org.osgi.service.cm.ConfigurationException;
 import org.osgi.service.cm.ManagedService;
 import org.slf4j.Logger;
@@ -66,7 +70,7 @@ public class MotionBinding extends AbstractBinding<MotionBindingProvider> implem
 	public void bindingChanged(BindingProvider provider, String itemName) {
 		if (provider instanceof MotionBindingProvider) {
 			MotionBindingProvider motionProvider = (MotionBindingProvider) provider;
-			registerItemConfig(motionProvider.getItemConfig(itemName));
+			registerBindingConfig(motionProvider.getBindingConfig(itemName));
 		}		
 	}
 	
@@ -78,8 +82,50 @@ public class MotionBinding extends AbstractBinding<MotionBindingProvider> implem
 		if (provider instanceof MotionBindingProvider) {
 			MotionBindingProvider motionProvider = (MotionBindingProvider) provider;
 			for (String itemName : motionProvider.getItemNames()) {
-				registerItemConfig(motionProvider.getItemConfig(itemName));
+				registerBindingConfig(motionProvider.getBindingConfig(itemName));
 			}
+		}
+	}
+	
+	/**
+	 * @{inheritDoc}
+	 */
+	@Override
+	public void internalReceiveCommand(String itemName, Command command) {
+		logger.trace("internalReceiveCommand(itemname = {}, command = {})", itemName, command.toString());
+		
+		for (MotionBindingProvider provider : providers) {
+			MotionBindingConfig bindingConfig = provider.getBindingConfig(itemName);
+			
+			String cameraId = bindingConfig.getCameraId();
+			
+			Camera camera = camerasById.get(cameraId);
+			if (camera == null) {
+				logger.warn("Item binding '{}' references camera id '{}' which has not been configured", itemName, cameraId);
+				return;
+			}
+		
+			try {
+				switch (bindingConfig.getCommandType()) {
+					case MOTION:
+						logger.warn("The 'motion' command is readonly. Ignoring.");
+						break;
+					
+					case ARMED:
+						camera.setMotionDetectEnabled(command.equals(OnOffType.ON));
+						break;
+					
+					case MASKED: 
+						camera.setMaskEnabled(command.equals(OnOffType.ON));
+						break;
+
+					default:
+						logger.warn("Unsupported command type '{}'", bindingConfig.getCommandType()); 
+				}
+			}
+			catch (Exception e) {
+				logger.warn("Error executing command type '" + bindingConfig.getCommandType() + "'", e);
+			}	
 		}
 	}
 	
@@ -101,25 +147,51 @@ public class MotionBinding extends AbstractBinding<MotionBindingProvider> implem
             
             // the config-key enumeration contains additional keys that we
             // don't want to process here ...
-            if ("service.pid".equals(key)) {
+            if ("service.pid".equals(key))
                 continue;
-            }
-            
-            Matcher matcher = CAMERA_CONFIG_PATTERN.matcher(key);
             
             String value = (String) properties.get(key);
+            if (StringUtils.isEmpty(value))
+            	continue;
             
-            if (matcher.matches()) {	
+            Matcher matcher = CAMERA_CONFIG_PATTERN.matcher(key);            
+            if (matcher.matches()) {
+            	
             	String cameraId = matcher.group(1);
+            	String cameraConfig = matcher.group(2);
+            	
             	if (!camerasById.containsKey(cameraId)) {
             		Camera camera = new Camera(cameraId, eventPublisher);
             		camerasById.put(cameraId, camera);
             	}
 
-                String cameraConfig = matcher.group(2);
+            	Camera camera = camerasById.get(cameraId);
+            	
                 if (cameraConfig.equals("url")) {
-                    camerasById.get(cameraId).setUrl( value );
+                	// TODO: validation of URL?
+                    camera.setUrl( value );
+                } else if (cameraConfig.equals("encoding")) {
+                	// TODO: validation of encoding type?
+                    camera.setEncoding(value);
+                } else if (cameraConfig.equals("mask")) {
+            		File mask = new File(value);
+            		if (!mask.exists()) {
+            			logger.warn("Mask file does not exist ({}). Ignoring.", value);
+            			continue;
+            		}
+            		if (!mask.isFile()) {
+            			logger.warn("Mask file is not a file ({}). Ignoring.", value);
+            			continue;
+            		}                			
+            		camera.setMask(mask);
+                } else if (cameraConfig.equals("encoding")) {
+                	try {
+                		camera.setSensitivity(Integer.parseInt(value));
+                	} catch (NumberFormatException e) {
+                		logger.warn("Invalid 'encoding' value specified ({}). Ignoring.", value);
+                	}
                 }
+
             } else {
     			logger.warn("Unexpected or unsupported configuration: " + key + ". Ignoring.");            	
             }
@@ -145,18 +217,26 @@ public class MotionBinding extends AbstractBinding<MotionBindingProvider> implem
 		camerasById.clear();
 	}
 	
-	private void registerItemConfig(MotionBindingConfig itemConfig) {	
-		if (itemConfig == null)
+	private void registerBindingConfig(MotionBindingConfig bindingConfig) {	
+		if (bindingConfig == null)
 			return;
 		
-		String itemName = itemConfig.getItemName();
-		String cameraId = itemConfig.getCameraId();
+		String cameraId = bindingConfig.getCameraId();
+		String itemName = bindingConfig.getItemName();
 
-		if (!camerasById.containsKey(cameraId)) {
+		Camera camera = camerasById.get(cameraId);
+		if (camera == null) {
 			logger.warn("Item binding '{}' references camera id '{}' which has not been configured", itemName, cameraId);
+			return;
 		}
 		
-		Camera camera = camerasById.get(cameraId);
-		camera.registerItemName(itemName);
-	}		
+		switch (bindingConfig.getCommandType()) {
+			case MOTION:
+				camera.registerItemName(itemName);
+				break;
+			
+			default:
+				logger.warn("Unsupported command type '{}'", bindingConfig.getCommandType()); 
+		}
+	}
 }

@@ -25,6 +25,8 @@ import org.openhab.model.item.binding.BindingConfigParseException;
  * 
  * <ul>
  * 	<li><code>{ motion="camera1:motion" }</code> - ON when motion detected, OFF when motion ceases</li>
+ * 	<li><code>{ motion="camera1:armed" }</code> - ON to enable motion detection, OFF to disable</li>
+ * 	<li><code>{ motion="camera1:masked" }</code> - ON to enable the mask image (specified in the binding config), OFF to disable</li>
  * </ul>
  * 
  * @author Ben Jones
@@ -58,15 +60,30 @@ public class MotionGenericBindingProvider extends AbstractGenericBindingProvider
 		super.processBindingConfiguration(context, item, bindingConfig);
 
         if (StringUtils.isEmpty(bindingConfig))
-            throw new BindingConfigParseException("Null config for " + item.getName() + " - expecting a camera id");
-		
-		addBindingConfig(item, new MotionBindingConfig(item.getName(), bindingConfig));
+            throw new BindingConfigParseException("Null config for " + item.getName() + " - expecting <cameraId>:<command>");
+
+        MotionBindingConfig config = parseBindingConfig(item, bindingConfig);
+		addBindingConfig(item, config);
 	}
 	
 	/**
 	 * {@inheritDoc}
 	 */
-	public MotionBindingConfig getItemConfig(String itemName) {
+	public MotionBindingConfig getBindingConfig(String itemName) {
 		return (MotionBindingConfig) this.bindingConfigs.get(itemName);
 	}
+	
+	private MotionBindingConfig parseBindingConfig(Item item, String bindingConfig) throws BindingConfigParseException {
+		String[] configParts = bindingConfig.split(":");
+		
+		if (configParts.length < 2)
+			throw new BindingConfigParseException("Motion binding configuration must consist of two parts [config=" + configParts + "]");
+
+		String cameraId = StringUtils.trim(configParts[0]);
+
+		String command = StringUtils.trim(configParts[1]);
+		CommandType commandType = CommandType.fromString(command);
+		
+		return new MotionBindingConfig(item.getName(), cameraId, commandType);
+	}	
 }
